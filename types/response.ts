@@ -13,13 +13,13 @@ export type {
   Message,
   PlaygroundConfig,
   PlaygroundResponseRequest,
-} from "@/package/types"
+} from "./config"
 
 export {
   convertBackendToUIMessage,
   convertUIToBackendMessages,
   createUserMessage,
-} from "@/package/types"
+} from "./config"
 
 
 

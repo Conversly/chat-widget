@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla"
 import type { StoreApi } from "zustand/vanilla"
-import type { Message, ChatbotResponseData } from "../types"
+import type { Message, ChatbotResponseData } from "../types/config"
 import type { WidgetWsChatMessagePayload, WidgetWsStateUpdatePayload } from "../types/websocket"
 
 export type ConversationPhase =
@@ -106,13 +106,13 @@ export function createChatStore({
       ? initialMessages
       : initialAssistantMessage
         ? [
-            {
-              id: "initial-assistant",
-              role: "assistant" as const,
-              content: initialAssistantMessage,
-              createdAt: new Date(),
-            },
-          ]
+          {
+            id: "initial-assistant",
+            role: "assistant" as const,
+            content: initialAssistantMessage,
+            createdAt: new Date(),
+          },
+        ]
         : []
 
   return createStore<ChatStore>()((set) => ({
@@ -251,13 +251,13 @@ export function createChatStore({
     resetChat: (opts) => {
       const initial = opts?.initialAssistantMessage
         ? [
-            {
-              id: "initial-assistant",
-              role: "assistant" as const,
-              content: opts.initialAssistantMessage,
-              createdAt: new Date(),
-            },
-          ]
+          {
+            id: "initial-assistant",
+            role: "assistant" as const,
+            content: opts.initialAssistantMessage,
+            createdAt: new Date(),
+          },
+        ]
         : []
 
       set({

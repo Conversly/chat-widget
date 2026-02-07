@@ -156,8 +156,8 @@ export function useChatController({
       try {
         const history = await getChatHistory(
           {
-            uniqueClientId: config.uniqueClientId,
-            converslyWebId: config.converslyWebId,
+            uniqueClientId: config.uniqueClientId || "unknown_client",
+            converslyWebId: config.converslyWebId || "unknown_web",
           },
           { originUrl: window.location.href },
           convId,
@@ -168,7 +168,7 @@ export function useChatController({
         // don't apply stale history/meta that would resurrect the old conversation.
         if (store.getState().conversationId !== convId) return
 
-        const mapped: Message[] = (history.messages || []).map((m) => {
+        const mapped: Message[] = (history.messages || []).map((m: any) => {
           const createdAt = new Date(m.created_at)
           return {
             id: m.message_id,
@@ -187,7 +187,7 @@ export function useChatController({
             {
               id: "initial-assistant",
               role: "assistant" as const,
-              content: config.InitialMessage,
+              content: config.InitialMessage || "",
               createdAt: new Date(),
             },
           ])
@@ -236,7 +236,7 @@ export function useChatController({
         if (hasInitialMessage) {
           return prev.map((m) =>
             m.id === "initial-assistant"
-              ? { ...m, content: config.InitialMessage }
+              ? { ...m, content: config.InitialMessage || "" }
               : m
           )
         }
@@ -246,7 +246,7 @@ export function useChatController({
             {
               id: "initial-assistant",
               role: "assistant" as const,
-              content: config.InitialMessage,
+              content: config.InitialMessage || "",
               createdAt: new Date(),
             },
           ]

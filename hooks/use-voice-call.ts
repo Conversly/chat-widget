@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import type { VoiceState, TranscriptMessage } from "@/types/config"
 import type { LiveKitTokenResponse } from "@/types/voice.ts"
-import type { Message } from "@/components/widget/chat-message"
+import type { Message } from "@/types/config"
 import { generateVoiceToken } from "@/lib/api/voice"
 
 interface UseVoiceCallOptions {
@@ -16,7 +16,7 @@ interface UseVoiceCallReturn {
   transcript: TranscriptMessage[]
   isCallMinimized: boolean
   voiceConnection: LiveKitTokenResponse | null
-  
+
   // Handlers
   handleStartCall: () => Promise<void>
   handleEndCall: () => void
@@ -25,7 +25,7 @@ interface UseVoiceCallReturn {
   handleVoiceConnected: () => void
   handleVoiceDisconnected: () => void
   updateTranscript: (transcript: TranscriptMessage[]) => void
-  
+
   // Helpers
   getTranscriptAsMessages: () => Message[]
   isCallActive: boolean
@@ -40,7 +40,7 @@ export function useVoiceCall({
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([])
   const [isCallMinimized, setIsCallMinimized] = useState(false)
   const [voiceConnection, setVoiceConnection] = useState<LiveKitTokenResponse | null>(null)
-  
+
   // Refs
   const callTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -72,17 +72,17 @@ export function useVoiceCall({
     setVoiceState('connecting')
     setCallDuration(0)
     setTranscript([])
-    
+
     try {
       console.log("[Conversly Voice] Requesting voice token for chatbot:", chatbotId)
       const tokenResponse = await generateVoiceToken(chatbotId)
-      
+
       console.log("[Conversly Voice] Voice token received:", {
         serverUrl: tokenResponse.serverUrl,
         roomName: tokenResponse.roomName,
         hasToken: !!tokenResponse.participantToken,
       })
-      
+
       setVoiceConnection(tokenResponse)
       // Note: voiceState will be set to 'connected' by the LiveKit onConnected callback
     } catch (err) {
@@ -104,7 +104,7 @@ export function useVoiceCall({
     setVoiceState('disconnected')
     setIsCallMinimized(false)
     setVoiceConnection(null)
-    
+
     // Reset voice state after a short delay
     setTimeout(() => {
       setVoiceState('idle')
@@ -153,7 +153,7 @@ export function useVoiceCall({
     transcript,
     isCallMinimized,
     voiceConnection,
-    
+
     // Handlers
     handleStartCall,
     handleEndCall,
@@ -162,7 +162,7 @@ export function useVoiceCall({
     handleVoiceConnected,
     handleVoiceDisconnected,
     updateTranscript,
-    
+
     // Helpers
     getTranscriptAsMessages,
     isCallActive,
