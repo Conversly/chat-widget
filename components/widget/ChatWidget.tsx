@@ -11,7 +11,7 @@ import { ChatView } from "./ChatView";
 import { usePostMessage } from "@/hooks/usePostMessage";
 import { streamChatbotResponse } from "@/lib/api/response";
 import { getChatHistory, listVisitorConversations } from "@/lib/api/activity";
-import { useChat, type ChatStatus } from "@/hooks/use-chat";
+import { useChat, type ChatStatus } from "@/hooks/use-chat-state";
 import { getStoredVisitorId, getStoredConversationId, setStoredConversationId } from "@/lib/storage";
 import { WidgetWebSocketClient } from "@/store/widget-websocket-client";
 import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "@/types/websocket";

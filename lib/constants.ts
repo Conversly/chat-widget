@@ -95,42 +95,5 @@ export const UI_TEXT = {
     rejectButton: "No, not interested",
   },
 
-  // Footer
-  footer: {
-    poweredBy: (brand: string) => `Powered by ${brand}`,
-  },
 
-  // Captcha
-  captcha: {
-    protectedBy: (service: string) => `Protected by ${service}`,
-    privacyPolicy: "Privacy Policy",
-    termsOfService: "Terms of Service",
-    recaptcha: {
-      message: "This site is protected by {recaptchaLink} and the Google {privacyLink} and {termsLink} apply",
-    },
-    hcaptcha: {
-      message: "This site is protected by {hcaptchaLink} and its {privacyLink} and {termsLink} apply",
-    },
-  },
-
-  // Search (for future use)
-  search: {
-    inputPlaceholder: "Search sources...",
-    askAICTA: "Ask AI instead",
-    noResults: "No results found. Try rephrasing your query or asking the AI.",
-    askAIPrefix: "Ask AI:",
-    instantAnswer: "Get an instant AI answer",
-  },
-
-  // Ask AI features (for future use)
-  askAI: {
-    exampleQuestionsTitle: "Example Questions",
-    sourcesLabel: "Sources",
-    viewSources: "View Sources",
-    deepThinking: "Deep thinking",
-    deepThinkingDescription: "For harder questions. Searches longer across all sources. Takes up to ~1 minute.",
-    deepThinkingCountdown: (seconds: number) => `Running deep thinking mode up to a minute. ${seconds}s…`,
-    gatheringSources: "Gathering sources…",
-    answerBasedOnSources: "Answer based on the following sources:",
-  },
 } as const;
