@@ -1,3 +1,12 @@
+export type VoiceState = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
+
+export interface TranscriptMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+}
+
 export interface VoiceProviderSettings {
     // ElevenLabs
     stability?: number;           // 0-1

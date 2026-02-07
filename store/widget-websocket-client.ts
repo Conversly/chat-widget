@@ -4,7 +4,7 @@ import {
   type WidgetWsInboundMessage,
   type WidgetWsOutboundMessage,
   type WidgetWsOutboundUserMessage,
-} from "../types/websocket"
+} from "@/types/activity"
 
 export type WidgetWsConnectionState =
   | "disconnected"

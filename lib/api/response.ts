@@ -1,90 +1,30 @@
 import { API } from "@/lib/api/config";
 import type { ApiResponse } from "@/lib/api/config";
-import type {
-  ChatbotResponseRequest,
-  ChatbotResponseData,
-  FeedbackRequest,
-  FeedbackResponse,
-  ChatMessage,
-  PlaygroundResponseRequest,
+import {
+  type ChatbotResponseRequest,
+  type ChatbotResponseData,
+  type FeedbackRequest,
+  type FeedbackResponse,
+  type PlaygroundResponseRequest,
+  type ResponseServiceErrorPayload,
+  type ResponseStreamEvent,
+  type ResponseStreamCallbacks,
+  type ChatbotHistoryData,
 } from "@/types/response";
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
+import { getStoredVisitorId, setStoredVisitorId, VISITOR_ID_HEADER } from "@/lib/storage";
+import { ResponseServiceApiError } from "@/lib/api/errors";
+import { type ChatHistoryMessage, type ChatMessage } from "@/types/activity";
 
-export type ResponseServiceErrorPayload = {
-  error?: string;
-  message?: string;
-  timestamp?: string;
+// Re-export for consumers that still import from this file
+export type {
+  ResponseServiceErrorPayload,
+  ResponseStreamEvent,
+  ResponseStreamCallbacks,
+  ChatHistoryMessage,
+  ChatbotHistoryData,
 };
-
-export class ResponseServiceApiError extends Error {
-  error?: string;
-  timestamp?: string;
-  status?: number;
-
-  constructor(payload: ResponseServiceErrorPayload, opts?: { status?: number }) {
-    super(payload.message || payload.error || "Response service error");
-    this.name = "ResponseServiceApiError";
-    this.error = payload.error;
-    this.timestamp = payload.timestamp;
-    this.status = opts?.status;
-  }
-}
-
-export type ChatHistoryMessage = {
-  message_id: string;
-  role: "user" | "assistant";
-  content: string;
-  citations: string[];
-  created_at: string;
-};
-
-export type ChatbotHistoryData = ChatbotResponseData & {
-  messages: ChatHistoryMessage[];
-};
-
-export type ResponseStreamEvent =
-  | {
-      type: "meta";
-      conversation_id?: string;
-      message_id?: string;
-      request_id?: string;
-    }
-  | {
-      type: "delta";
-      delta?: string;
-    }
-  | {
-      type: "control";
-      escalate?: boolean;
-      reason?: string;
-    }
-  | {
-      type: "citations";
-      citations?: string[];
-    }
-  | {
-      type: "final";
-      response?: ChatbotResponseData;
-    }
-  | {
-      type: "error";
-      error?: string;
-      message?: string;
-    };
-
-export type ResponseStreamCallbacks = {
-  onMeta?: (event: Extract<ResponseStreamEvent, { type: "meta" }>) => void;
-  onDelta?: (delta: string, accumulated: string) => void;
-  onControl?: (escalate: boolean, reason?: string) => void;
-  onCitations?: (citations: string[]) => void;
-  onFinal?: (response: ChatbotResponseData) => void;
-  onError?: (error: string, message?: string) => void;
-  /**
-   * Called for malformed NDJSON lines (best-effort; the stream continues).
-   * This is intentionally separate from server `type: "error"` events.
-   */
-  onParseError?: (line: string, err: unknown) => void;
-};
+export { ResponseServiceApiError };
 
 // Create a separate axios instance for response API
 export const responseFetch = axios.create({
@@ -94,12 +34,28 @@ export const responseFetch = axios.create({
 
 responseFetch.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    const vid = getStoredVisitorId();
+    if (vid) {
+      config.headers = config.headers || {};
+      // Don't override if caller set it explicitly.
+      if (!(VISITOR_ID_HEADER.toLowerCase() in (config.headers as any))) {
+        (config.headers as any)[VISITOR_ID_HEADER] = vid;
+      }
+    }
     return config;
   },
   (error: unknown) => {
     return Promise.reject(error);
   },
 );
+
+responseFetch.interceptors.response.use((res) => {
+  const headerVal = (res.headers as any)?.["x-visitor-id"];
+  if (typeof headerVal === "string" && headerVal.trim()) {
+    setStoredVisitorId(headerVal);
+  }
+  return res;
+});
 
 function asApiErrorFromResponseText(
   status: number,
@@ -132,16 +88,24 @@ export async function streamChatbotResponse(
   const base = (API.RESPONSE_BASE_URL || "").replace(/\/$/, "");
   const url = new URL(API.ENDPOINTS.RESPONSE.STREAM(), `${base}/`).toString();
 
+  const existingVisitorId = getStoredVisitorId();
   const res = await fetch(url, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/x-ndjson, application/json",
+      ...(existingVisitorId ? { [VISITOR_ID_HEADER]: existingVisitorId } : {}),
     },
     body: JSON.stringify(requestBody),
     signal,
   });
+
+  // Persist visitor id ASAP so conversationId can be stored under the right key.
+  const headerVisitorId = res.headers.get(VISITOR_ID_HEADER);
+  if (headerVisitorId && headerVisitorId.trim()) {
+    setStoredVisitorId(headerVisitorId);
+  }
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
@@ -197,7 +161,12 @@ export async function streamChatbotResponse(
 
           switch ((event as ResponseStreamEvent).type) {
             case "meta": {
-              callbacks.onMeta?.(event as Extract<ResponseStreamEvent, { type: "meta" }>);
+              const meta = event as Extract<ResponseStreamEvent, { type: "meta" }>;
+              const vid = (meta as any)?.visitor_id;
+              if (typeof vid === "string" && vid.trim()) {
+                setStoredVisitorId(vid);
+              }
+              callbacks.onMeta?.(meta);
               break;
             }
             case "delta": {
@@ -465,61 +434,6 @@ export const getChatbotResponse = async (
 
   if (!res.success) {
     throw new ResponseServiceApiError({ error: "unsuccessful_response", message: "Failed to get chatbot response" });
-  }
-
-  return res;
-};
-
-/**
- * Fetch full chat transcript for an existing widget conversation.
- * Mirrors /response envelope and adds `messages`.
- */
-export const getChatHistory = async (
-  user: ChatbotResponseRequest["user"],
-  metadata: ChatbotResponseRequest["metadata"] | undefined,
-  conversationId: string,
-  testing: boolean = false,
-): Promise<ChatbotHistoryData> => {
-  // Testing mode: return empty transcript but preserve envelope shape
-  if (testing) {
-    return {
-      success: true,
-      response: "",
-      citations: [],
-      conversation_id: conversationId,
-      messages: [],
-    };
-  }
-
-  const requestBody: Pick<ChatbotResponseRequest, "user" | "metadata"> = {
-    user,
-    metadata,
-  };
-
-  let res: ChatbotHistoryData;
-  try {
-    res = await responseFetch("/history", {
-      method: "POST",
-      params: { conversation_id: conversationId },
-      data: requestBody,
-    }).then((res: AxiosResponse<ChatbotHistoryData>) => res.data);
-  } catch (err: unknown) {
-    if (axios.isAxiosError(err)) {
-      const status = err.response?.status;
-      const data = err.response?.data as unknown;
-      if (data && typeof data === "object" && "error" in data) {
-        const payload = data as ResponseServiceErrorPayload;
-        throw new ResponseServiceApiError(payload, { status });
-      }
-    }
-    throw err;
-  }
-
-  if (!res.success) {
-    throw new ResponseServiceApiError({
-      error: "unsuccessful_response",
-      message: "Failed to get chat history",
-    });
   }
 
   return res;

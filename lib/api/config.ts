@@ -1,9 +1,55 @@
 export const API = {
-  BASE_URL: "https://terminal.apps.verlyai.xyz/api/v1",
-  WS_BASE_URL: "wss://ws.apps.verlyai.xyz",
-  RESPONSE_BASE_URL: "https://response.apps.verlyai.xyz",
-  // RESPONSE_BASE_URL: "http://localhost:8030",
+  /**
+   * Terminal service base URL (z-terminal).
+   * Override via `NEXT_PUBLIC_TERMINAL_BASE_URL`.
+   */
+  BASE_URL:
+    (typeof process !== "undefined" &&
+      (process.env as any)?.NEXT_PUBLIC_TERMINAL_BASE_URL) ||
+    "https://terminal.apps.verlyai.xyz/api/v1",
+
+  /**
+   * WebSocket base URL (socket server).
+   * Override via `NEXT_PUBLIC_WS_BASE_URL`.
+   */
+  WS_BASE_URL:
+    (typeof process !== "undefined" && (process.env as any)?.NEXT_PUBLIC_WS_BASE_URL) ||
+    "wss://ws.apps.verlyai.xyz",
+
+  /**
+   * Response service base URL (response-service).
+   * Override via `NEXT_PUBLIC_RESPONSE_BASE_URL`.
+   */
+  RESPONSE_BASE_URL:
+    (typeof process !== "undefined" &&
+      (process.env as any)?.NEXT_PUBLIC_RESPONSE_BASE_URL) ||
+    "https://response.apps.verlyai.xyz",
   ENDPOINTS: {
+    /**
+     * Terminal service routes (base: `API.BASE_URL`)
+     * - z-terminal: `/activity/*`, `/deploy/*`, `/voice/*`
+     */
+    TERMINAL: {
+      ACTIVITY: {
+        HISTORY: () => "/activity/history",
+        CONVERSATIONS_BY_VISITOR: () => "/activity/conversations/by-visitor",
+      },
+      DEPLOY: {
+        WIDGET_EXTERNAL: () => "/deploy/widget/external",
+      },
+      VOICE: {
+        GENERATE_TOKEN: (chatbotId: string) =>
+          `/voice/${encodeURIComponent(chatbotId)}/token`,
+      },
+      LEADS: {
+        BASE_URL: () => "/leads",
+      },
+    },
+
+    /**
+     * Response service routes (base: `API.RESPONSE_BASE_URL`)
+     * - response-service: `/response/*`, `/playground/response/*`
+     */
     RESPONSE: {
       BASE_URL: () => "/response",
       STREAM: () => "/response/stream",
@@ -12,13 +58,14 @@ export const API = {
       PLAYGROUND: () => "/playground/response",
       PLAYGROUND_STREAM: () => "/playground/response/stream",
     },
+
+    // Legacy aliases (prefer `ENDPOINTS.TERMINAL.*` in new code)
     DEPLOY: {
-      BASE_URL: () => "/deploy",
-      WIDGET: () => "/external/:chatbotId",  // get
+      WIDGET_EXTERNAL: () => "/deploy/widget/external", // GET (params: chatbotId)
     },
     VOICE: {
-      BASE_URL: () => "/voice",
-      GENERATE_TOKEN: () => "/:chatbotId/token", // POST to get LiveKit token
+      GENERATE_TOKEN: (chatbotId: string) =>
+        `/voice/${encodeURIComponent(chatbotId)}/token`, // POST
     },
   },
 };

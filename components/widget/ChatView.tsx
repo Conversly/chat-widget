@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronLeft, X, MoreHorizontal, Maximize2, Minimize2, RefreshCw, VolumeX, Volume2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { WidgetConfig, Conversation, Message } from "@/types/widget";
+import type { WidgetConfig } from "@/types/chatbot";
+import type { Conversation, Message } from "@/types/activity";
 import {
     Conversation as ConversationContainer,
     ConversationContent,

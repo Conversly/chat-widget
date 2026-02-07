@@ -2,7 +2,8 @@
 
 import { X, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { WidgetConfig, Conversation } from "@/types/widget";
+import type { WidgetConfig } from "@/types/chatbot";
+import type { Conversation } from "@/types/activity";
 import { BottomNav } from "./HomeView";
 
 interface MessagesViewProps {

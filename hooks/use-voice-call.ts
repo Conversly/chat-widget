@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
-import type { VoiceState, TranscriptMessage } from "@/types/config"
+import type { VoiceState, TranscriptMessage } from "@/types/voice"
 import type { LiveKitTokenResponse } from "@/types/voice.ts"
-import type { Message } from "@/types/config"
+import type { Message } from "@/types/activity"
 import { generateVoiceToken } from "@/lib/api/voice"
 
 interface UseVoiceCallOptions {

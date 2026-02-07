@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { ChatWidget } from "./ChatWidget";
 import { getWidgetConfig } from "@/lib/api/chatbot";
-import type { WidgetConfig } from "@/types/widget";
+import type { WidgetConfig } from "@/types/chatbot";
 
 interface EmbeddedWidgetProps {
     chatbotId: string;
@@ -113,6 +113,7 @@ export function EmbeddedWidget({ chatbotId, testing = false }: EmbeddedWidgetPro
                     ],
 
                     // API Credentials
+                    chatbotId: String(chatbotId),
                     converslyWebId: response.partial.converslyWebId ?? "",
                     uniqueClientId: response.partial.uniqueClientId ?? "",
                     testing: testing,

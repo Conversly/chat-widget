@@ -3,11 +3,11 @@ import type {
   Message,
   UIConfigInput,
   ChatbotResponseData,
-} from "../types/config"
+} from "../types/chatbot"
 import { useChatStore, useChatStoreApi } from "../store/use-chat-store"
 import { WidgetWebSocketClient } from "../store/widget-websocket-client"
 import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "../types/websocket"
-import { getChatHistory } from "@/lib/api/response"
+import { getChatHistory } from "@/lib/api/activity"
 
 export type SendMessageStreamCallbacks = {
   onMeta?: (event: { conversation_id?: string; message_id?: string; request_id?: string }) => void
@@ -155,13 +155,9 @@ export function useChatController({
       store.getState().setIsTyping(true)
       try {
         const history = await getChatHistory(
-          {
-            uniqueClientId: config.uniqueClientId || "unknown_client",
-            converslyWebId: config.converslyWebId || "unknown_web",
-          },
-          { originUrl: window.location.href },
+          config.chatbotId || "",
           convId,
-          config.testing ?? false
+          config.testing ?? false,
         )
 
         // If user started a new chat (or conversationId changed) while this request was in flight,

@@ -1,7 +1,7 @@
 import { createStore } from "zustand/vanilla"
 import type { StoreApi } from "zustand/vanilla"
-import type { Message, ChatbotResponseData } from "../types/config"
-import type { WidgetWsChatMessagePayload, WidgetWsStateUpdatePayload } from "../types/websocket"
+import type { ChatbotResponseData } from "@/types/response"
+import type { Message, WidgetWsChatMessagePayload, WidgetWsStateUpdatePayload } from "@/types/activity"
 
 export type ConversationPhase =
   | "BOT_ACTIVE"

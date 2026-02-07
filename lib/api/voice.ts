@@ -13,10 +13,7 @@ import type { LiveKitTokenResponse } from "@/types/voice";
 export const generateVoiceToken = async (
     chatbotId: string,
 ): Promise<LiveKitTokenResponse> => {
-
-    const endpoint =  API.BASE_URL + API.ENDPOINTS.VOICE.BASE_URL() +
-        API.ENDPOINTS.VOICE.GENERATE_TOKEN().replace(":chatbotId", chatbotId);
-
+    const endpoint = API.BASE_URL + API.ENDPOINTS.TERMINAL.VOICE.GENERATE_TOKEN(chatbotId);
 
     console.log('[Voice API] Generating token with:', { 
         chatbotId, 

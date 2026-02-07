@@ -2,7 +2,8 @@
 
 import { X, Home, MessageSquare, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { WidgetConfig, Conversation, NewsFeedItem } from "@/types/widget";
+import type { WidgetConfig, NewsFeedItem } from "@/types/chatbot";
+import type { Conversation } from "@/types/activity";
 
 interface HomeViewProps {
     config: WidgetConfig;

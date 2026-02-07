@@ -2,7 +2,7 @@
 
 import { useRef } from "react"
 import { Send, Paperclip, Smile, Mic } from "lucide-react"
-import type { WidgetConfig } from "@/types/widget"
+import type { WidgetConfig } from "@/types/chatbot";
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useAutosizeTextArea } from "@/hooks/use-autosize-textarea"

@@ -2,14 +2,16 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import type { WidgetConfig, WidgetView, Conversation, Message } from "@/types/widget";
+import type { WidgetConfig, WidgetView } from "@/types/chatbot";
+import type { Conversation, Message, ChatMessage } from "@/types/activity";
 import { HomeView } from "./HomeView";
 import { MessagesView } from "./MessagesView";
 import { ChatView } from "./ChatView";
 import { usePostMessage } from "@/hooks/usePostMessage";
 import { streamChatbotResponse } from "@/lib/api/response";
-import type { ChatMessage } from "@/types/response";
+import { getChatHistory, listVisitorConversations } from "@/lib/api/activity";
 import { useChat, type ChatStatus } from "@/hooks/use-chat";
+import { getStoredVisitorId, getStoredConversationId, setStoredConversationId } from "@/lib/storage";
 
 interface ChatWidgetProps {
     config: WidgetConfig;
@@ -114,6 +116,8 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
     }, []);
 
     const handleStartNewConversation = useCallback(() => {
+        // Force response-service to create a fresh conversation.
+        setStoredConversationId(null);
         const newConversation: Conversation = {
             id: Date.now().toString(),
             agent: {
@@ -142,20 +146,88 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
         setCurrentView("chat");
     }, [config, clearMessages, addMessage]);
 
-    const handleSelectConversation = (conversation: Conversation) => {
+    const handleSelectConversation = useCallback(async (conversation: Conversation) => {
         setActiveConversation(conversation);
         clearMessages();
 
-        if (config.greeting) {
-            addMessage({
-                role: "assistant",
-                content: config.greeting,
-                status: "delivered",
-            });
+        setCurrentView("chat");
+        setStatus("submitted");
+
+        // Persist selection as "current" conversation.
+        setStoredConversationId(conversation.id);
+
+        try {
+            const history = await getChatHistory(
+                config.chatbotId || "",
+                conversation.id,
+                config.testing ?? false
+            );
+
+            const mapped = (history.messages || []).map((m) => ({
+                id: m.message_id,
+                role: m.role,
+                content: m.content,
+                createdAt: new Date(m.created_at),
+                status: "delivered" as const,
+            }));
+
+            if (mapped.length > 0) {
+                setMessages(mapped as any);
+            } else if (config.greeting) {
+                // If the conversation exists but has no stored messages yet, show greeting.
+                setMessages([{
+                    id: "initial-assistant",
+                    role: "assistant",
+                    content: config.greeting,
+                    createdAt: new Date(),
+                    status: "delivered" as const,
+                }] as any);
+            }
+            setStatus("ready");
+        } catch (e) {
+            console.error("[ChatWidget] Failed to load history:", e);
+            setStatus("ready");
+        }
+    }, [clearMessages, config.converslyWebId, config.greeting, config.testing, config.uniqueClientId, setMessages, setStatus]);
+
+    const refreshConversations = useCallback(async () => {
+        if (typeof window === "undefined") return;
+        const visitorId = getStoredVisitorId();
+        if (!visitorId) {
+            setConversations([]);
+            return;
         }
 
-        setCurrentView("chat");
-    };
+        try {
+            const items = await listVisitorConversations(visitorId);
+            const mapped: Conversation[] = items.map((c) => {
+                const tsRaw = c.lastUserMessageAt || c.lastMessageAt || c.createdAt;
+                const ts = new Date(tsRaw);
+                return {
+                    id: c.conversationId,
+                    agent: {
+                        id: "1",
+                        name: config.botName || config.agents?.[0]?.name || "Support",
+                        status: "online",
+                        avatar: config.botAvatar || config.agents?.[0]?.avatar,
+                    },
+                    lastMessage: c.lastUserMessage || "",
+                    lastMessageTime: Number.isNaN(ts.getTime()) ? new Date() : ts,
+                    unreadCount: 0,
+                };
+            });
+            setConversations(mapped);
+        } catch (e) {
+            console.error("[ChatWidget] Failed to load conversations:", e);
+            setConversations([]);
+        }
+    }, [config.agents, config.botAvatar, config.botName]);
+
+    // Load conversation list when user opens Messages view.
+    useEffect(() => {
+        if (currentView !== "messages") return;
+        void refreshConversations();
+    }, [currentView, refreshConversations]);
 
     const handleSendMessage = useCallback(async (content: string) => {
         // Add user message
@@ -212,18 +284,37 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                 metadata: {
                     originUrl: typeof window !== "undefined" ? window.location.href : undefined,
                 },
+                conversationId: getStoredConversationId() || undefined,
             };
 
             await streamChatbotResponse(requestBody, {
+                onMeta: (meta) => {
+                    if (meta.conversation_id) {
+                        const convId = meta.conversation_id;
+                        setStoredConversationId(convId);
+                        // If we were in a "new chat" placeholder, update the active conversation id.
+                        setActiveConversation((prev) =>
+                            prev ? { ...prev, id: convId } : prev
+                        );
+                    }
+                },
                 onDelta: (_delta, accumulated) => {
                     updateMessage(assistantMessageId, { content: accumulated });
                 },
                 onFinal: (response) => {
+                    if (response.conversation_id) {
+                        const convId = response.conversation_id;
+                        setStoredConversationId(convId);
+                        setActiveConversation((prev) =>
+                            prev ? { ...prev, id: convId } : prev
+                        );
+                    }
                     updateMessage(assistantMessageId, {
                         content: response.response,
                         status: "delivered",
                     });
                     setStatus("ready");
+                    void refreshConversations();
                 },
                 onError: (error) => {
                     console.error("[ChatWidget] Stream error:", error);
@@ -242,7 +333,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
             });
             setStatus("error");
         }
-    }, [messages, config, addMessage, updateMessage, setStatus]);
+    }, [messages, config, addMessage, updateMessage, setStatus, refreshConversations]);
 
     const handleSuggestedMessageClick = useCallback((message: string) => {
         const newConversation: Conversation = {
@@ -279,9 +370,10 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
     // Convert our ChatMessage to the widget Message type
     const widgetMessages: Message[] = messages.map((m) => ({
         id: m.id,
-        role: m.role,
+        role: m.role as any, // Cast to any to avoid strict role mismatch if minor differences exist, or map correctly.
         content: m.content,
-        timestamp: m.createdAt,
+        createdAt: m.createdAt,
+        timestamp: m.createdAt, // Compatibility
         status: m.status,
         agentId: activeConversation?.agent.id,
     }));
@@ -319,7 +411,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                     conversation={activeConversation}
                     messages={widgetMessages}
                     onSendMessage={handleSendMessage}
-                    onBack={() => setActiveConversation(null)}
+                    onBack={handleBackToMessages}
                     onClose={() => {
                         window.parent.postMessage({ type: "widget:close" }, "*");
                     }}
