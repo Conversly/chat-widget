@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import type {
-  Message,
   UIConfigInput,
-  ChatbotResponseData,
 } from "../types/chatbot"
+import type { Message } from "@/types/activity"
+import type { ChatbotResponseData } from "@/types/response"
 import { useChatStore, useChatStoreApi } from "../store/use-chat-store"
 import { WidgetWebSocketClient } from "../store/widget-websocket-client"
 import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "../types/websocket"
@@ -46,6 +46,10 @@ export interface UseChatControllerReturn {
   conversationId: string | null
   escalation: ChatbotResponseData["escalation"] | null
   conversationPhase: "BOT_ACTIVE" | "WAITING_FOR_AGENT" | "HUMAN_ACTIVE" | "CLOSED"
+
+  // Assigned agent identity (populated via WS STATE_UPDATE)
+  assignedAgentDisplayName: string | null
+  assignedAgentAvatarUrl: string | null
 
   // Setters
   setInput: (input: string) => void
@@ -90,6 +94,8 @@ export function useChatController({
   const escalation = useChatStore((s) => s.escalation)
   const conversationPhase = useChatStore((s) => s.conversationPhase)
   const widgetState = useChatStore((s) => s.widgetState)
+  const assignedAgentDisplayName = useChatStore((s) => s.assignedAgentDisplayName)
+  const assignedAgentAvatarUrl = useChatStore((s) => s.assignedAgentAvatarUrl)
 
   const setInput = useCallback((next: string) => store.getState().setInput(next), [store])
   const setIsOpen = useCallback((next: boolean) => store.getState().setIsOpen(next), [store])
@@ -649,6 +655,10 @@ export function useChatController({
     conversationId,
     escalation,
     conversationPhase,
+
+    // Assigned agent identity
+    assignedAgentDisplayName,
+    assignedAgentAvatarUrl,
 
     // Setters
     setInput,

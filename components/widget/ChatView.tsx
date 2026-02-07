@@ -23,6 +23,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChatInput } from "./ChatInput";
 
+export interface AssignedAgentInfo {
+    displayName: string | null;
+    avatarUrl: string | null;
+}
+
 interface ChatViewProps {
     config: WidgetConfig;
     conversation: Conversation;
@@ -36,6 +41,8 @@ interface ChatViewProps {
     onMute?: () => void;
     isMuted?: boolean;
     status?: "ready" | "submitted" | "streaming" | "error";
+    /** Agent identity from WS STATE_UPDATE, used for role:"agent" messages. */
+    assignedAgent?: AssignedAgentInfo;
 }
 
 export function ChatView({
@@ -51,6 +58,7 @@ export function ChatView({
     onMute,
     isMuted,
     status = "ready",
+    assignedAgent,
 }: ChatViewProps) {
     const [input, setInput] = useState("");
 
@@ -230,38 +238,58 @@ export function ChatView({
                             </div>
 
                             {/* Messages */}
-                            {group.messages.map((msg) => (
-                                <div key={msg.id} className="mb-3">
-                                    <MessageBubble from={msg.role === "user" ? "user" : "assistant"}>
-                                        <MessageContent>
-                                            {msg.role === "assistant" ? (
-                                                msg.content ? (
-                                                    <MessageResponse>{msg.content}</MessageResponse>
-                                                ) : (
-                                                    <div className="flex gap-1 h-5 items-center px-1">
-                                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                                                    </div>
-                                                )
-                                            ) : (
-                                                <span>{msg.content}</span>
-                                            )}
-                                        </MessageContent>
-                                    </MessageBubble>
-                                    <div
-                                        className={cn(
-                                            "mt-1 px-4",
-                                            msg.role === "user" ? "text-right" : "text-left"
+                            {group.messages.map((msg) => {
+                                const isAgent = msg.role === "agent";
+                                const agentName = assignedAgent?.displayName || "Agent";
+                                const agentAvatar = assignedAgent?.avatarUrl;
+
+                                return (
+                                    <div key={msg.id} className="mb-3">
+                                        {/* Agent identity label (only for agent messages) */}
+                                        {isAgent && (
+                                            <div className="flex items-center gap-2 px-4 mb-1">
+                                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-medium overflow-hidden shrink-0">
+                                                    {agentAvatar ? (
+                                                        <img src={agentAvatar} alt={agentName} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        agentName.charAt(0)
+                                                    )}
+                                                </div>
+                                                <span className="text-xs font-medium text-gray-600">{agentName}</span>
+                                            </div>
                                         )}
-                                    >
-                                        <MessageTimestamp
-                                            date={msg.timestamp || new Date()}
-                                            format="time"
-                                        />
+
+                                        <MessageBubble from={msg.role === "user" ? "user" : "assistant"}>
+                                            <MessageContent>
+                                                {msg.role === "assistant" || isAgent ? (
+                                                    msg.content ? (
+                                                        <MessageResponse>{msg.content}</MessageResponse>
+                                                    ) : (
+                                                        <div className="flex gap-1 h-5 items-center px-1">
+                                                            <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                                                            <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                                                            <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                                                        </div>
+                                                    )
+                                                ) : (
+                                                    <span>{msg.content}</span>
+                                                )}
+                                            </MessageContent>
+                                        </MessageBubble>
+                                        <div
+                                            className={cn(
+                                                "mt-1 px-4",
+                                                msg.role === "user" ? "text-right" : "text-left"
+                                            )}
+                                        >
+                                            <MessageTimestamp
+                                                date={msg.timestamp || new Date()}
+                                                format="time"
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ))}
                 </ConversationContent>

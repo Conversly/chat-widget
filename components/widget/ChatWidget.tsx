@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { WidgetConfig, WidgetView } from "@/types/chatbot";
 import type { Conversation, Message, ChatMessage } from "@/types/activity";
+import type { ChatbotResponseData } from "@/types/response";
 import { HomeView } from "./HomeView";
 import { MessagesView } from "./MessagesView";
 import { ChatView } from "./ChatView";
@@ -12,6 +13,8 @@ import { streamChatbotResponse } from "@/lib/api/response";
 import { getChatHistory, listVisitorConversations } from "@/lib/api/activity";
 import { useChat, type ChatStatus } from "@/hooks/use-chat";
 import { getStoredVisitorId, getStoredConversationId, setStoredConversationId } from "@/lib/storage";
+import { WidgetWebSocketClient } from "@/store/widget-websocket-client";
+import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "@/types/websocket";
 
 interface ChatWidgetProps {
     config: WidgetConfig;
@@ -38,6 +41,15 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
     const [currentView, setCurrentView] = useState<WidgetView>("home");
     const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [conversationId, setConversationId] = useState<string | null>(null);
+    const [escalation, setEscalation] = useState<ChatbotResponseData["escalation"] | null>(null);
+    const [isHumanActive, setIsHumanActive] = useState(false);
+    const [assignedAgent, setAssignedAgent] = useState<{ displayName: string | null; avatarUrl: string | null }>({
+        displayName: null,
+        avatarUrl: null,
+    });
+    const wsClientRef = useRef<WidgetWebSocketClient | null>(null);
+    const wsRoomIdRef = useRef<string | null>(null);
 
     // Use our new unified chat hook
     const {
@@ -51,6 +63,111 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
     } = useChat();
 
     const isLeft = config.position === "bottom-left";
+
+    const shouldConnectWsForEscalationStatus = useCallback((status: unknown) => {
+        if (typeof status !== "string") return false;
+        return (
+            status === "REQUESTED" ||
+            status === "WAITING_FOR_AGENT" ||
+            status === "ASSIGNED" ||
+            status === "HUMAN_ACTIVE"
+        );
+    }, []);
+
+    const shouldRouteMessagesToHuman = useCallback((status: unknown) => {
+        return status === "HUMAN_ACTIVE";
+    }, []);
+
+    // Instantiate WS client once
+    useEffect(() => {
+        if (wsClientRef.current) return;
+
+        wsClientRef.current = new WidgetWebSocketClient({
+            onConnectionStateChange: (_state) => {
+                // no-op for now (UI doesn't surface it yet)
+            },
+            onError: (err) => {
+                console.warn("[ChatWidget] WebSocket error:", err);
+            },
+            onMessage: (msg: WidgetWsInboundMessage) => {
+                // Join command response
+                if ("status" in msg && typeof (msg as any).status === "string") {
+                    const room = (msg as any).room;
+                    if (typeof room === "string" && room.length > 0) {
+                        wsRoomIdRef.current = room;
+                    }
+                    return;
+                }
+
+                // Broadcast envelope
+                if ("eventType" in msg && "data" in msg) {
+                    const eventType = (msg as any).eventType as string;
+                    const data = (msg as any).data as any;
+
+                    if (eventType === WidgetWsInboundEventType.STATE_UPDATE) {
+                        // Informational: capture assigned agent identity for UI
+                        setAssignedAgent({
+                            displayName:
+                                typeof data?.assignedAgentDisplayName === "string"
+                                    ? data.assignedAgentDisplayName
+                                    : null,
+                            avatarUrl:
+                                typeof data?.assignedAgentAvatarUrl === "string"
+                                    ? data.assignedAgentAvatarUrl
+                                    : null,
+                        });
+
+                        // If backend reports HUMAN_ACTIVE, route user messages via WS only.
+                        if (shouldRouteMessagesToHuman(data?.status)) {
+                            setIsHumanActive(true);
+                        }
+                        return;
+                    }
+
+                    if (eventType === WidgetWsInboundEventType.CHAT_MESSAGE) {
+                        // Only AGENT messages trigger takeover + are displayed as role:"agent"
+                        if (data?.senderType !== "AGENT") return;
+                        const text = typeof data?.text === "string" ? data.text : "";
+                        if (!text) return;
+
+                        setIsHumanActive(true);
+                        addMessage({
+                            role: "agent",
+                            content: text,
+                            status: "delivered",
+                        });
+                        return;
+                    }
+
+                    if (eventType === WidgetWsInboundEventType.ERROR) {
+                        console.warn("[ChatWidget] WS server error:", data);
+                        return;
+                    }
+                }
+            },
+        });
+    }, [addMessage]);
+
+    // Connect WS whenever we have a conversationId + escalation (requested/active)
+    useEffect(() => {
+        const client = wsClientRef.current;
+        if (!client) return;
+
+        const convId = conversationId || getStoredConversationId();
+        const shouldConnect = !!convId && !!escalation;
+
+        if (!shouldConnect) {
+            client.disconnect();
+            wsRoomIdRef.current = null;
+            return;
+        }
+
+        const roomId = `conversation:${convId}`;
+        wsRoomIdRef.current = roomId;
+        // Avoid the "join before open" transient error by connecting first.
+        client.connect();
+        client.join(roomId);
+    }, [conversationId, escalation]);
 
     // PostMessage handlers for iframe control from host
     const messageHandlers = useMemo(() => [
@@ -118,6 +235,12 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
     const handleStartNewConversation = useCallback(() => {
         // Force response-service to create a fresh conversation.
         setStoredConversationId(null);
+        setConversationId(null);
+        setEscalation(null);
+        setIsHumanActive(false);
+        wsClientRef.current?.disconnect();
+        wsRoomIdRef.current = null;
+        setAssignedAgent({ displayName: null, avatarUrl: null });
         const newConversation: Conversation = {
             id: Date.now().toString(),
             agent: {
@@ -155,6 +278,9 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
 
         // Persist selection as "current" conversation.
         setStoredConversationId(conversation.id);
+        setConversationId(conversation.id);
+        setIsHumanActive(false);
+        setAssignedAgent({ displayName: null, avatarUrl: null });
 
         try {
             const history = await getChatHistory(
@@ -184,6 +310,17 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                 }] as any);
             }
             setStatus("ready");
+
+            // If history indicates escalation is requested/active, connect WS immediately.
+            const histEsc = (history as any)?.escalation;
+            if (histEsc && shouldConnectWsForEscalationStatus(histEsc.status)) {
+                setEscalation(histEsc);
+                if (shouldRouteMessagesToHuman(histEsc.status)) {
+                    setIsHumanActive(true);
+                }
+            } else {
+                setEscalation(null);
+            }
         } catch (e) {
             console.error("[ChatWidget] Failed to load history:", e);
             setStatus("ready");
@@ -230,6 +367,29 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
     }, [currentView, refreshConversations]);
 
     const handleSendMessage = useCallback(async (content: string) => {
+        // If a human has taken over, route messages via WS only.
+        if (isHumanActive) {
+            const convId = getStoredConversationId();
+            const roomId = wsRoomIdRef.current || (convId ? `conversation:${convId}` : null);
+            if (!convId || !roomId) return;
+
+            const localId = addMessage({
+                role: "user",
+                content,
+                status: "sent",
+            });
+
+            wsClientRef.current?.sendUserMessage({
+                roomId,
+                conversationId: convId,
+                text: content,
+                // let backend correlate if desired
+                messageId: localId,
+            });
+
+            return;
+        }
+
         // Add user message
         const userMessageId = addMessage({
             role: "user",
@@ -292,10 +452,17 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                     if (meta.conversation_id) {
                         const convId = meta.conversation_id;
                         setStoredConversationId(convId);
+                        setConversationId(convId);
                         // If we were in a "new chat" placeholder, update the active conversation id.
                         setActiveConversation((prev) =>
                             prev ? { ...prev, id: convId } : prev
                         );
+                    }
+                },
+                onControl: (escalate, reason) => {
+                    // Early escalation hint: connect WS ASAP (final response is authoritative).
+                    if (escalate) {
+                        setEscalation({ id: "pending", status: "REQUESTED", reason });
                     }
                 },
                 onDelta: (_delta, accumulated) => {
@@ -305,10 +472,27 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                     if (response.conversation_id) {
                         const convId = response.conversation_id;
                         setStoredConversationId(convId);
+                        setConversationId(convId);
                         setActiveConversation((prev) =>
                             prev ? { ...prev, id: convId } : prev
                         );
                     }
+
+                    // Authoritative escalation flag
+                    if (response.escalation && shouldConnectWsForEscalationStatus(response.escalation.status)) {
+                        setEscalation(response.escalation);
+                    } else if (response.escalation) {
+                        // Escalation object exists but status isn't in the connect set; still treat as escalated.
+                        setEscalation(response.escalation);
+                    } else {
+                        setEscalation(null);
+                    }
+
+                    // If backend says escalation is HUMAN_ACTIVE, stop routing to LLM from now on.
+                    if (shouldRouteMessagesToHuman(response.escalation?.status)) {
+                        setIsHumanActive(true);
+                    }
+
                     updateMessage(assistantMessageId, {
                         content: response.response,
                         status: "delivered",
@@ -412,6 +596,8 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                     messages={widgetMessages}
                     onSendMessage={handleSendMessage}
                     onBack={handleBackToMessages}
+                    status={status}
+                    assignedAgent={assignedAgent}
                     onClose={() => {
                         window.parent.postMessage({ type: "widget:close" }, "*");
                     }}

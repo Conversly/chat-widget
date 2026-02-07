@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 
 export interface ChatMessage {
     id: string;
-    role: "user" | "assistant" | "system";
+    role: "user" | "assistant" | "system" | "agent";
     content: string;
     createdAt: Date;
     status?: "sending" | "sent" | "streaming" | "delivered" | "error";

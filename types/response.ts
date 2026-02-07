@@ -30,11 +30,13 @@ export interface ChatbotResponseData {
   conversation_id?: string;
   conversation_status?: "ACTIVE" | "CLOSED";
   message_id?: string;
+  request_id?: string;
   responseId?: string;
   escalation?: {
     id: string;
     status: string;
     reason?: string;
+    requested_at?: string;
   };
   partial?: {
     styles?: any;
