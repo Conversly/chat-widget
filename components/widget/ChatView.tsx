@@ -1,17 +1,40 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronLeft, X, MoreHorizontal, Paperclip, Smile, Image, Mic, Send } from "lucide-react";
+import { ChevronLeft, X, MoreHorizontal, Maximize2, Minimize2, RefreshCw, VolumeX, Volume2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WidgetConfig, Conversation, Message } from "@/types/widget";
+import {
+    Conversation as ConversationContainer,
+    ConversationContent,
+    ConversationScrollButton,
+    Message as MessageBubble,
+    MessageContent,
+    MessageResponse,
+    MessageTimestamp,
+} from "@/components/ai";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { ChatInput } from "./ChatInput";
 
 interface ChatViewProps {
     config: WidgetConfig;
     conversation: Conversation;
     messages: Message[];
-    onClose: () => void;
+    onSendMessage: (content: string) => Promise<void>;
     onBack: () => void;
-    onSendMessage: (content: string) => void;
+    onClose: () => void;
+    onToggleMaximize?: () => void;
+    isMaximized?: boolean;
+    onNewChat?: () => void;
+    onMute?: () => void;
+    isMuted?: boolean;
+    status?: "ready" | "submitted" | "streaming" | "error";
 }
 
 export function ChatView({
@@ -21,29 +44,20 @@ export function ChatView({
     onClose,
     onBack,
     onSendMessage,
+    onToggleMaximize,
+    isMaximized,
+    onNewChat,
+    onMute,
+    isMuted,
+    status = "ready",
 }: ChatViewProps) {
     const [input, setInput] = useState("");
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Auto-scroll to bottom when messages change
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
-
-    // Format timestamp
-    const formatMessageTime = (date: Date): string => {
-        const now = new Date();
-        const diffDays = Math.floor(
-            (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        if (diffDays === 0) {
-            return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        } else if (diffDays < 7) {
-            return date.toLocaleDateString([], { weekday: "short" });
-        } else {
-            return date.toLocaleDateString([], { month: "short", day: "numeric" });
+    // Handle submit
+    const handleSubmit = (text: string) => {
+        if (text.trim()) {
+            onSendMessage(text.trim());
+            setInput("");
         }
     };
 
@@ -59,374 +73,217 @@ export function ChatView({
         return date.toLocaleDateString([], { month: "long", day: "numeric" });
     };
 
-    // Handle submit
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (input.trim()) {
-            onSendMessage(input.trim());
-            setInput("");
-            // Reset textarea height
-            if (textareaRef.current) {
-                textareaRef.current.style.height = "auto";
-            }
-        }
-    };
-
-    // Handle keydown for enter to send
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSubmit(e);
-        }
-    };
-
     // Group messages by date
     const groupedMessages: { date: Date; messages: Message[] }[] = [];
     let currentDate: string | null = null;
 
     messages.forEach((msg) => {
-        const dateStr = msg.timestamp.toDateString();
+        const timestamp = msg.timestamp || new Date();
+        const dateStr = timestamp.toDateString();
         if (dateStr !== currentDate) {
             currentDate = dateStr;
-            groupedMessages.push({ date: msg.timestamp, messages: [msg] });
+            groupedMessages.push({ date: timestamp, messages: [msg] });
         } else {
             groupedMessages[groupedMessages.length - 1].messages.push(msg);
         }
     });
 
+    // Get suggested messages from config (show only when no user messages yet)
+    const hasUserMessages = messages.some((m) => m.role === "user");
+    const showSuggestions = !hasUserMessages && config.suggestedMessages?.length;
+
+    // Download chat history as JSON file
+    const handleDownloadChat = () => {
+        const chatData = {
+            exportedAt: new Date().toISOString(),
+            chatbotName: config.brandName || "Chatbot",
+            messages: messages.map((msg) => ({
+                id: msg.id,
+                role: msg.role,
+                content: msg.content,
+                createdAt: msg.timestamp?.toISOString(),
+            })),
+        };
+
+        const blob = new Blob([JSON.stringify(chatData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `chat-export-${new Date().toISOString().split("T")[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     return (
-        <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col bg-white">
             {/* Header */}
-            <div
-                className={cn(
-                    "flex items-center justify-between px-3 py-3 border-b",
-                    config.appearance === "dark"
-                        ? "bg-gray-900 border-gray-800"
-                        : "bg-white border-gray-200"
-                )}
-            >
-                <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center gap-3">
                     <button
                         onClick={onBack}
-                        className={cn(
-                            "p-1 rounded transition-colors",
-                            config.appearance === "dark"
-                                ? "text-gray-400 hover:text-white hover:bg-gray-800"
-                                : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
-                        )}
+                        className="p-1 hover:bg-gray-100 rounded-full transition-colors"
                     >
-                        <ChevronLeft className="w-5 h-5" />
+                        <ChevronLeft className="w-5 h-5 text-gray-600" />
                     </button>
-
-                    {/* Agent Avatar */}
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-300">
-                        {conversation.agent.avatar ? (
-                            <img
-                                src={conversation.agent.avatar}
-                                alt={conversation.agent.name}
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-sm font-medium text-gray-600">
-                                {conversation.agent.name.charAt(0)}
+                    <div className="flex items-center gap-2">
+                        {/* Agent avatar */}
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
+                            {conversation.agent.avatar || config.botAvatar || config.widgetIcon ? (
+                                <img
+                                    src={conversation.agent.avatar || config.botAvatar || config.widgetIcon}
+                                    alt={conversation.agent.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                conversation.agent.name.charAt(0)
+                            )}
+                        </div>
+                        <div>
+                            <div className="font-medium text-gray-900 text-sm">
+                                {conversation.agent.name}
                             </div>
-                        )}
-                    </div>
-
-                    {/* Agent Info */}
-                    <div>
-                        <p
-                            className={cn(
-                                "font-medium text-sm leading-tight",
-                                config.appearance === "dark" ? "text-white" : "text-gray-900"
-                            )}
-                        >
-                            {conversation.agent.name}
-                        </p>
-                        <p
-                            className={cn(
-                                "text-xs",
-                                conversation.agent.status === "online"
-                                    ? "text-green-500"
-                                    : config.appearance === "dark"
-                                        ? "text-gray-500"
-                                        : "text-gray-400"
-                            )}
-                        >
-                            {conversation.agent.status === "online"
-                                ? "Active now"
-                                : `Active ${formatMessageTime(conversation.lastMessageTime)}`}
-                        </p>
+                            <div className="text-xs text-green-600 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                {conversation.agent.status === "online" ? "Online" : "Away"}
+                            </div>
+                        </div>
                     </div>
                 </div>
+                <div className="flex items-center gap-1">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                className="p-2 hover:bg-gray-100 rounded-full transition-colors outline-none"
+                                title="More options"
+                            >
+                                <MoreHorizontal className="w-5 h-5 text-gray-600" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            {onToggleMaximize && (
+                                <DropdownMenuItem onClick={onToggleMaximize}>
+                                    {isMaximized ? (
+                                        <>
+                                            <Minimize2 className="mr-2 h-4 w-4" />
+                                            <span>Minimize</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Maximize2 className="mr-2 h-4 w-4" />
+                                            <span>Maximize</span>
+                                        </>
+                                    )}
+                                </DropdownMenuItem>
+                            )}
+                            {onNewChat && (
+                                <DropdownMenuItem onClick={onNewChat}>
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                    <span>Start new chat</span>
+                                </DropdownMenuItem>
+                            )}
+                            {onMute && (
+                                <DropdownMenuItem onClick={onMute}>
+                                    {isMuted ? (
+                                        <>
+                                            <Volume2 className="mr-2 h-4 w-4" />
+                                            <span>Unmute sounds</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <VolumeX className="mr-2 h-4 w-4" />
+                                            <span>Mute sounds</span>
+                                        </>
+                                    )}
+                                </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={handleDownloadChat}>
+                                <Download className="mr-2 h-4 w-4" />
+                                <span>Download chat as JSON</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
-                <button
-                    onClick={onClose}
-                    className={cn(
-                        "p-2 rounded transition-colors",
-                        config.appearance === "dark"
-                            ? "text-gray-400 hover:text-white hover:bg-gray-800"
-                            : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
-                    )}
-                >
-                    <X className="w-5 h-5" />
-                </button>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                        title="Close"
+                    >
+                        <X className="w-5 h-5 text-gray-600" />
+                    </button>
+                </div>
             </div>
 
-            {/* Messages Area */}
-            <div
-                className={cn(
-                    "flex-1 overflow-y-auto px-4 py-4",
-                    config.appearance === "dark" ? "bg-gray-900" : "bg-gray-50"
-                )}
-            >
-                {groupedMessages.map((group, groupIdx) => (
-                    <div key={groupIdx}>
-                        {/* Date Separator */}
-                        <div className="flex items-center justify-center my-4">
-                            <span
-                                className={cn(
-                                    "text-xs px-3 py-1",
-                                    config.appearance === "dark"
-                                        ? "text-gray-500"
-                                        : "text-gray-400"
-                                )}
-                            >
-                                {formatDateSeparator(group.date)}
-                            </span>
-                        </div>
+            {/* Messages Area - Using our new Conversation component */}
+            <ConversationContainer className="flex-1 relative">
+                <ConversationContent>
+                    {groupedMessages.map((group, groupIndex) => (
+                        <div key={groupIndex}>
+                            {/* Date separator */}
+                            <div className="flex items-center justify-center my-4">
+                                <span className="text-xs text-gray-400 bg-white px-3">
+                                    {formatDateSeparator(group.date)}
+                                </span>
+                            </div>
 
-                        {/* Messages */}
-                        {group.messages.map((message, msgIdx) => {
-                            const isUser = message.role === "user";
-                            const isSystem = message.role === "system";
-                            const showAgentJoined =
-                                msgIdx === 0 && message.role === "assistant" && groupIdx === 0;
-
-                            return (
-                                <div key={message.id}>
-                                    {/* Agent joined notice */}
-                                    {showAgentJoined && (
-                                        <div className="flex items-center justify-center gap-2 my-3">
-                                            <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-300">
-                                                {conversation.agent.avatar ? (
-                                                    <img
-                                                        src={conversation.agent.avatar}
-                                                        alt={conversation.agent.name}
-                                                        className="w-full h-full object-cover"
-                                                    />
+                            {/* Messages */}
+                            {group.messages.map((msg) => (
+                                <div key={msg.id} className="mb-3">
+                                    <MessageBubble from={msg.role === "user" ? "user" : "assistant"}>
+                                        <MessageContent>
+                                            {msg.role === "assistant" ? (
+                                                msg.content ? (
+                                                    <MessageResponse>{msg.content}</MessageResponse>
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xs font-medium text-gray-600">
-                                                        {conversation.agent.name.charAt(0)}
+                                                    <div className="flex gap-1 h-5 items-center px-1">
+                                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                                                     </div>
-                                                )}
-                                            </div>
-                                            <span
-                                                className={cn(
-                                                    "text-xs",
-                                                    config.appearance === "dark"
-                                                        ? "text-gray-500"
-                                                        : "text-gray-400"
-                                                )}
-                                            >
-                                                <strong
-                                                    className={
-                                                        config.appearance === "dark"
-                                                            ? "text-gray-300"
-                                                            : "text-gray-600"
-                                                    }
-                                                >
-                                                    {conversation.agent.name}
-                                                </strong>{" "}
-                                                joined the conversation
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {/* Message Bubble */}
+                                                )
+                                            ) : (
+                                                <span>{msg.content}</span>
+                                            )}
+                                        </MessageContent>
+                                    </MessageBubble>
                                     <div
                                         className={cn(
-                                            "flex mb-2",
-                                            isUser ? "justify-end" : "justify-start"
+                                            "mt-1 px-4",
+                                            msg.role === "user" ? "text-right" : "text-left"
                                         )}
                                     >
-                                        <div
-                                            className={cn(
-                                                "max-w-[75%] px-4 py-2 rounded-2xl",
-                                                isUser
-                                                    ? "rounded-br-md text-white"
-                                                    : config.appearance === "dark"
-                                                        ? "bg-gray-800 text-white rounded-bl-md"
-                                                        : "bg-white text-gray-900 rounded-bl-md shadow-sm"
-                                            )}
-                                            style={
-                                                isUser ? { backgroundColor: config.primaryColor } : {}
-                                            }
-                                        >
-                                            <p className="text-sm whitespace-pre-wrap">
-                                                {message.content}
-                                            </p>
-                                        </div>
+                                        <MessageTimestamp
+                                            date={msg.timestamp || new Date()}
+                                            format="time"
+                                        />
                                     </div>
-
-                                    {/* Agent name and time for assistant messages */}
-                                    {!isUser && msgIdx === group.messages.filter(m => m.role === "assistant").length - 1 && (
-                                        <div className="flex items-center gap-1 mb-3 ml-1">
-                                            <span
-                                                className={cn(
-                                                    "text-xs",
-                                                    config.appearance === "dark"
-                                                        ? "text-gray-500"
-                                                        : "text-gray-400"
-                                                )}
-                                            >
-                                                {conversation.agent.name} •{" "}
-                                                {formatMessageTime(message.timestamp)}
-                                            </span>
-                                        </div>
-                                    )}
                                 </div>
-                            );
-                        })}
-                    </div>
-                ))}
-
-                {/* Suggested Messages - show when no user messages yet */}
-                {config.suggestedMessages && config.suggestedMessages.length > 0 &&
-                    !messages.some(m => m.role === "user") && (
-                        <div className="mt-4 space-y-2">
-                            <p
-                                className={cn(
-                                    "text-xs font-medium uppercase tracking-wider",
-                                    config.appearance === "dark" ? "text-gray-400" : "text-gray-500"
-                                )}
-                            >
-                                Suggested Questions
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                                {config.suggestedMessages.map((message, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => onSendMessage(message)}
-                                        className={cn(
-                                            "px-3 py-2 rounded-full text-sm transition-colors border",
-                                            config.appearance === "dark"
-                                                ? "bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700"
-                                                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                                        )}
-                                        style={{
-                                            borderColor: `${config.primaryColor}30`,
-                                        }}
-                                    >
-                                        {message}
-                                    </button>
-                                ))}
-                            </div>
+                            ))}
                         </div>
-                    )}
-                <div ref={messagesEndRef} />
-            </div>
+                    ))}
+                </ConversationContent>
+                <ConversationScrollButton />
+            </ConversationContainer>
 
             {/* Input Area */}
-            <div
-                className={cn(
-                    "px-4 py-3 border-t",
-                    config.appearance === "dark"
-                        ? "bg-gray-900 border-gray-800"
-                        : "bg-white border-gray-200"
-                )}
-            >
-                <form onSubmit={handleSubmit} className="relative">
-                    <div
-                        className={cn(
-                            "flex items-end gap-2 px-4 py-3 rounded-2xl border",
-                            config.appearance === "dark"
-                                ? "bg-gray-800 border-gray-700"
-                                : "bg-gray-50 border-gray-200"
-                        )}
-                    >
-                        <textarea
-                            ref={textareaRef}
-                            value={input}
-                            onChange={(e) => {
-                                setInput(e.target.value);
-                                // Auto-resize
-                                e.target.style.height = "auto";
-                                e.target.style.height = `${Math.min(e.target.scrollHeight, 100)}px`;
-                            }}
-                            onKeyDown={handleKeyDown}
-                            placeholder={config.placeholder}
-                            rows={1}
-                            className={cn(
-                                "flex-1 bg-transparent border-none outline-none resize-none text-sm",
-                                config.appearance === "dark"
-                                    ? "text-white placeholder:text-gray-500"
-                                    : "text-gray-900 placeholder:text-gray-400"
-                            )}
-                            style={{ maxHeight: "100px" }}
-                        />
+            <ChatInput
+                config={config}
+                input={input}
+                setInput={setInput}
+                handleSendMessage={handleSubmit}
+                handleSuggestionClick={handleSubmit}
+                hasUserMessages={hasUserMessages}
+                disabled={status === "streaming"}
+            />
 
-                        {/* Action buttons */}
-                        <div className="flex items-center gap-1">
-                            <button
-                                type="button"
-                                className={cn(
-                                    "p-1.5 rounded transition-colors",
-                                    config.appearance === "dark"
-                                        ? "text-gray-500 hover:text-gray-300"
-                                        : "text-gray-400 hover:text-gray-600"
-                                )}
-                            >
-                                <Paperclip className="w-4 h-4" />
-                            </button>
-                            <button
-                                type="button"
-                                className={cn(
-                                    "p-1.5 rounded transition-colors",
-                                    config.appearance === "dark"
-                                        ? "text-gray-500 hover:text-gray-300"
-                                        : "text-gray-400 hover:text-gray-600"
-                                )}
-                            >
-                                <Smile className="w-4 h-4" />
-                            </button>
-                            <button
-                                type="button"
-                                className={cn(
-                                    "p-1.5 rounded transition-colors",
-                                    config.appearance === "dark"
-                                        ? "text-gray-500 hover:text-gray-300"
-                                        : "text-gray-400 hover:text-gray-600"
-                                )}
-                            >
-                                <Image className="w-4 h-4" />
-                            </button>
-                            <button
-                                type="button"
-                                className={cn(
-                                    "p-1.5 rounded transition-colors",
-                                    config.appearance === "dark"
-                                        ? "text-gray-500 hover:text-gray-300"
-                                        : "text-gray-400 hover:text-gray-600"
-                                )}
-                            >
-                                <Mic className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Send button (appears when input has text) */}
-                    {input.trim() && (
-                        <button
-                            type="submit"
-                            className="absolute right-2 bottom-2 p-2 rounded-full text-white transition-colors hover:opacity-90"
-                            style={{ backgroundColor: config.primaryColor }}
-                        >
-                            <Send className="w-4 h-4" />
-                        </button>
-                    )}
-                </form>
-            </div>
+            {/* Footer text if configured */}
+            {config.footerText && (
+                <div className="px-4 pb-2 text-center">
+                    <span className="text-xs text-gray-400">{config.footerText}</span>
+                </div>
+            )}
         </div>
     );
 }

@@ -174,10 +174,10 @@
 
         if (data.type === 'widget:resize') {
             var payload = data.payload || {};
-            var width = payload.width;
-            var height = payload.height;
-            if (width) container.style.width = width;
-            if (height) container.style.height = height;
+            if (payload.width) container.style.width = payload.width;
+            if (payload.height) container.style.height = payload.height;
+            if (payload.maxWidth) container.style.maxWidth = payload.maxWidth;
+            if (payload.maxHeight) container.style.maxHeight = payload.maxHeight;
         }
     });
 

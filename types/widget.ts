@@ -8,6 +8,11 @@ export interface WidgetConfig {
   bubbleColor?: string; // Widget bubble background color
   widgetIcon?: string; // Custom icon for the chat bubble
 
+  // Bot Identity
+  botName?: string;
+  botAvatar?: string;
+  showPoweredBy?: boolean;
+
   // Personalization
   userName?: string;
   userEmail?: string;
@@ -93,7 +98,7 @@ export interface Message {
   content: string;
   timestamp: Date;
   agentId?: string;
-  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error';
+  status?: 'sending' | 'sent' | 'streaming' | 'delivered' | 'read' | 'error';
 }
 
 export type WidgetView = 'home' | 'messages' | 'chat';
