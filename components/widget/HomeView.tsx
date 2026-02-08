@@ -1,15 +1,17 @@
 "use client";
 
-import { X, Home, MessageSquare, Send } from "lucide-react";
+import { X, Home, MessageSquare, Send, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WidgetConfig, NewsFeedItem } from "@/types/chatbot";
 import type { Conversation } from "@/types/activity";
+import { formatDistanceToNow } from "date-fns";
 
 interface HomeViewProps {
     config: WidgetConfig;
     onClose: () => void;
     onStartConversation: () => void;
     onViewMessages: () => void;
+    onSelectConversation: (conversation: Conversation) => void;
     onSuggestedMessageClick?: (message: string) => void;
     conversations: Conversation[];
 }
@@ -19,91 +21,181 @@ export function HomeView({
     onClose,
     onStartConversation,
     onViewMessages,
+    onSelectConversation,
     onSuggestedMessageClick,
     conversations,
 }: HomeViewProps) {
     const unreadCount = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
+    const recentConversation = conversations.length > 0 ? conversations[0] : null;
+
+    // Helper to format time relative to now (e.g. "2h ago")
+    const formatTime = (date: Date) => {
+        try {
+            return formatDistanceToNow(date, { addSuffix: true })
+                .replace("about ", "")
+                .replace("less than a minute ago", "just now");
+        } catch (e) {
+            return "";
+        }
+    };
 
     return (
-        <div className="h-full flex flex-col">
-            {/* Header with brand color */}
+        <div className="h-full flex flex-col bg-gray-50/50">
+            {/* Header with Gradient */}
             <div
-                className="relative px-6 pt-6 pb-8 rounded-t-2xl"
-                style={{ backgroundColor: config.primaryColor }}
+                className="relative px-6 pt-6 pb-24 rounded-b-[2rem] shadow-sm"
+                style={{
+                    background: `linear-gradient(135deg, ${config.primaryColor}, ${config.primaryColor}dd, ${config.primaryColor}aa)`,
+                }}
             >
-                {/* Close button */}
-                <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"
-                >
-                    <X className="w-5 h-5" />
-                </button>
-
-                {/* Brand and avatars */}
-                <div className="flex items-center justify-between mb-6">
+                {/* Close Button & Header Actions */}
+                <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-2">
-                        {config.brandLogo ? (
-                            <img src={config.brandLogo} alt={config.brandName} className="h-6" />
-                        ) : (
-                            <span className="text-white font-semibold text-lg">{config.brandName}</span>
-                        )}
+                        {/* Optional: Add back button or other header actions here if needed */}
+                        {/* For now, just Brand Name/Logo per design */}
+                        <div className="flex items-center gap-2 text-white/90">
+                            {config.brandLogo ? (
+                                <img src={config.brandLogo} alt={config.brandName} className="h-6 w-auto object-contain" />
+                            ) : config.widgetIcon ? (
+                                <img src={config.widgetIcon} alt="Logo" className="h-6 w-6" />
+                            ) : null}
+                            <span className="font-semibold text-lg tracking-tight">{config.brandName || "Support"}</span>
+                        </div>
                     </div>
 
-                    {/* Agent avatars removed per customization request */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={onClose}
+                            className="text-white/80 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-full"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Greeting */}
-                <div className="text-white">
-                    <h1 className="text-2xl font-semibold mb-1">
-                        {config.userName ? `Hi ${config.userName} 👋` : "Hi there 👋"}
+                <div className="text-white relative z-10">
+                    <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
+                        Hi there <span className="animate-wave origin-bottom-right inline-block">👋</span>
                     </h1>
-                    <p className="text-white/90 text-lg">{config.greeting}</p>
+                    <h2 className="text-xl font-semibold opacity-95">
+                        {config.greeting || "How can we help?"}
+                    </h2>
                 </div>
             </div>
 
-            {/* Content area */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-                {/* Send us a message button */}
-                <button
-                    onClick={onStartConversation}
-                    className={cn(
-                        "w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors",
-                        config.appearance === "dark"
-                            ? "bg-gray-800 hover:bg-gray-700 text-white"
-                            : "bg-gray-100 hover:bg-gray-200 text-gray-900"
-                    )}
-                >
-                    <span className="font-medium">Send us a message</span>
-                    <Send className="w-4 h-4" style={{ color: config.primaryColor }} />
-                </button>
+            {/* Content Area - Negative Margin to overlap header */}
+            <div className="flex-1 overflow-y-auto px-4 -mt-16 relative z-20 pb-4 space-y-4 no-scrollbar">
+
+                {/* Recent Message Card */}
+                {recentConversation && (
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                                Recent Message
+                            </h3>
+                        </div>
+
+                        <button
+                            onClick={() => onSelectConversation(recentConversation)}
+                            className="w-full text-left group"
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="relative shrink-0">
+                                    {recentConversation.agent.avatar ? (
+                                        <img
+                                            src={recentConversation.agent.avatar}
+                                            alt={recentConversation.agent.name}
+                                            className="w-10 h-10 rounded-full object-cover bg-gray-100"
+                                        />
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
+                                            {recentConversation.agent.name.charAt(0)}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between mb-0.5">
+                                        <span className="font-semibold text-gray-900 text-sm">
+                                            Chat with {recentConversation.agent.name}
+                                        </span>
+                                        <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
+                                            {formatTime(new Date(recentConversation.lastMessageTime))}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                                        {recentConversation.lastMessage || "Click to continue conversation..."}
+                                    </p>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                )}
+
+                {/* Send us a message Card */}
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                    <div className="flex items-start justify-between mb-3">
+                        <h3 className="font-bold text-gray-900">
+                            Send us a message
+                        </h3>
+                        <button
+                            onClick={onStartConversation}
+                            className="w-8 h-8 flex items-center justify-center rounded-full text-white transition-transform hover:scale-105 active:scale-95 shadow-md"
+                            style={{ backgroundColor: config.primaryColor }}
+                        >
+                            <Send className="w-4 h-4 ml-0.5" />
+                        </button>
+                    </div>
+
+                    <p className="text-sm text-gray-500 leading-relaxed mb-4">
+                        Ask us anything about our platform or system status.
+                    </p>
+
+                    {/* Footer / Avatars */}
+                    <div className="flex items-center gap-2">
+                        {config.showAgentAvatars && config.agents && config.agents.length > 0 ? (
+                            <div className="flex -space-x-2 overflow-hidden mr-2">
+                                {config.agents.slice(0, 3).map((agent, i) => (
+                                    <div key={i} className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-100 overflow-hidden">
+                                        {agent.avatar ? (
+                                            <img src={agent.avatar} alt={agent.name} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-gray-500">
+                                                {agent.name.charAt(0)}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+                        <span className="text-xs text-gray-400">
+                            Typically replies in under 5 mins
+                        </span>
+                    </div>
+                </div>
 
                 {/* Suggested Messages */}
                 {config.suggestedMessages && config.suggestedMessages.length > 0 && (
-                    <div className="space-y-2">
-                        <p
-                            className={cn(
-                                "text-xs font-medium uppercase tracking-wider",
-                                config.appearance === "dark" ? "text-gray-400" : "text-gray-500"
-                            )}
-                        >
-                            Quick Questions
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                        <h3 className="font-bold text-gray-900 mb-1">
+                            Suggested
+                        </h3>
+                        <p className="text-xs text-gray-400 mb-4">
+                            Frequently asked questions
                         </p>
+
                         <div className="flex flex-wrap gap-2">
                             {config.suggestedMessages.map((message, idx) => (
                                 <button
                                     key={idx}
                                     onClick={() => onSuggestedMessageClick?.(message)}
-                                    className={cn(
-                                        "px-3 py-2 rounded-full text-sm transition-colors border",
-                                        config.appearance === "dark"
-                                            ? "bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700"
-                                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                                    )}
-                                    style={{
-                                        borderColor: `${config.primaryColor}30`,
-                                    }}
+                                    className="group flex items-center gap-2 pl-4 pr-3 py-2.5 rounded-xl text-sm transition-all border w-full text-left hover:shadow-md bg-transparent border-gray-200 hover:bg-gray-50"
                                 >
-                                    {message}
+                                    <span className="flex-1 truncate text-gray-700">
+                                        {message}
+                                    </span>
+                                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
                                 </button>
                             ))}
                         </div>
@@ -113,6 +205,9 @@ export function HomeView({
                 {/* News Feed */}
                 {config.enableNewsFeed && config.newsFeedItems && config.newsFeedItems.length > 0 && (
                     <div className="space-y-3">
+                        <h3 className="px-1 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                            Latest Updates
+                        </h3>
                         {config.newsFeedItems.map((item) => (
                             <NewsFeedCard key={item.id} item={item} config={config} />
                         ))}
@@ -139,14 +234,7 @@ interface NewsFeedCardProps {
 
 function NewsFeedCard({ item, config }: NewsFeedCardProps) {
     return (
-        <div
-            className={cn(
-                "rounded-lg border overflow-hidden",
-                config.appearance === "dark"
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-200"
-            )}
-        >
+        <div className="rounded-lg border bg-white border-gray-200 overflow-hidden">
             <div className="p-4">
                 {item.version && (
                     <div className="flex items-center gap-2 mb-2">
@@ -161,20 +249,10 @@ function NewsFeedCard({ item, config }: NewsFeedCardProps) {
                         </span>
                     </div>
                 )}
-                <h3
-                    className={cn(
-                        "font-semibold text-sm mb-1",
-                        config.appearance === "dark" ? "text-white" : "text-gray-900"
-                    )}
-                >
+                <h3 className="font-semibold text-sm mb-1 text-gray-900">
                     {item.title}
                 </h3>
-                <p
-                    className={cn(
-                        "text-xs line-clamp-2",
-                        config.appearance === "dark" ? "text-gray-400" : "text-gray-600"
-                    )}
-                >
+                <p className="text-xs line-clamp-2 text-gray-600">
                     {item.description}
                 </p>
             </div>
@@ -205,25 +283,12 @@ export function BottomNav({
     unreadCount = 0,
 }: BottomNavProps) {
     return (
-        <div
-            className={cn(
-                "flex items-center justify-around py-3 border-t",
-                config.appearance === "dark"
-                    ? "bg-gray-900 border-gray-800"
-                    : "bg-white border-gray-200"
-            )}
-        >
+        <div className="flex items-center justify-around py-3 border-t bg-white border-gray-200">
             <button
                 onClick={onHomeClick}
                 className={cn(
                     "flex flex-col items-center gap-1 px-6 py-1 transition-colors",
-                    activeTab === "home"
-                        ? config.appearance === "dark"
-                            ? "text-white"
-                            : "text-gray-900"
-                        : config.appearance === "dark"
-                            ? "text-gray-500"
-                            : "text-gray-400"
+                    activeTab === "home" ? "text-gray-900" : "text-gray-400"
                 )}
             >
                 <Home className="w-5 h-5" />
@@ -234,13 +299,7 @@ export function BottomNav({
                 onClick={onMessagesClick}
                 className={cn(
                     "flex flex-col items-center gap-1 px-6 py-1 transition-colors relative",
-                    activeTab === "messages"
-                        ? config.appearance === "dark"
-                            ? "text-white"
-                            : "text-gray-900"
-                        : config.appearance === "dark"
-                            ? "text-gray-500"
-                            : "text-gray-400"
+                    activeTab === "messages" ? "text-gray-900" : "text-gray-400"
                 )}
             >
                 <div className="relative">

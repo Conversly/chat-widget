@@ -770,8 +770,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
 
     return (
         <div className={cn(
-            "h-full w-full flex flex-col overflow-hidden text-left antialiased relative",
-            config.appearance === "dark" ? "bg-gray-900" : "bg-white",
+            "h-full w-full flex flex-col overflow-hidden text-left antialiased relative bg-white",
         )}>
             {currentView === "home" && (
                 <HomeView
@@ -779,6 +778,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                     onClose={handleCloseWidget}
                     onStartConversation={handleStartNewConversation}
                     onViewMessages={() => setCurrentView("messages")}
+                    onSelectConversation={handleSelectConversation}
                     onSuggestedMessageClick={handleSuggestedMessageClick}
                     conversations={conversations}
                 />
