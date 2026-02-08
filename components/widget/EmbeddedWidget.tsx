@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import { ChatWidget } from "./ChatWidget";
 import { getWidgetConfig } from "@/lib/api/chatbot";
 import type { WidgetConfig } from "@/types/chatbot";
+import { usePostMessage } from "@/hooks/usePostMessage";
 
 interface EmbeddedWidgetProps {
     chatbotId: string;
     testing?: boolean;
+    playground?: boolean;
 }
 
 /**
@@ -16,10 +18,42 @@ interface EmbeddedWidgetProps {
  * - Transforms backend config to WidgetConfig format
  * - Supports testing mode
  */
-export function EmbeddedWidget({ chatbotId, testing = false }: EmbeddedWidgetProps) {
+export function EmbeddedWidget({ chatbotId, testing = false, playground = false }: EmbeddedWidgetProps) {
+    const [apiConfig, setApiConfig] = useState<WidgetConfig | null>(null);
+    const [playgroundOverrides, setPlaygroundOverrides] = useState<Partial<WidgetConfig> | null>(
+        playground ? { isPlayground: true } : null
+    );
     const [config, setConfig] = useState<WidgetConfig | null>(null);
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Merge API config and playground overrides whenever they change
+    useEffect(() => {
+        if (!apiConfig && !playgroundOverrides) {
+            setConfig(null);
+            return;
+        }
+
+        // Start with API config or empty object if just playground
+        const baseConfig = apiConfig || ({} as WidgetConfig);
+
+        // Merge overrides
+        const merged: WidgetConfig = {
+            ...baseConfig,
+            ...playgroundOverrides,
+            // Ensure nested objects are merged correctly if needed
+            playgroundOverrides: {
+                ...baseConfig.playgroundOverrides,
+                ...playgroundOverrides?.playgroundOverrides
+            }
+        };
+
+        // If we have at least a chatbotId or some basic config, set it
+        if (merged.chatbotId || testing || playgroundOverrides) {
+            setConfig(merged);
+        }
+    }, [apiConfig, playgroundOverrides, testing]);
 
     // Load config from API (or use default in testing mode)
     useEffect(() => {
@@ -46,7 +80,7 @@ export function EmbeddedWidget({ chatbotId, testing = false }: EmbeddedWidgetPro
                             { id: "1", title: "Welcome!", description: "This is a demo widget in testing mode." }
                         ],
                     };
-                    setConfig(defaultConfig);
+                    setApiConfig(defaultConfig);
                     setLoading(false);
                     return;
                 }
@@ -120,7 +154,7 @@ export function EmbeddedWidget({ chatbotId, testing = false }: EmbeddedWidgetPro
                 };
 
                 // console.log("[ChatWidget] Transformed config:", widgetConfig);
-                setConfig(widgetConfig);
+                setApiConfig(widgetConfig);
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to load widget configuration");
                 console.error("[ChatWidget] Error loading config:", err);
@@ -131,6 +165,41 @@ export function EmbeddedWidget({ chatbotId, testing = false }: EmbeddedWidgetPro
 
         loadConfig();
     }, [chatbotId, testing]);
+
+    // Handle playground updates from host
+    usePostMessage({
+        handlers: [
+            {
+                type: "widget:playground_update",
+                handler: (data: any) => {
+                    // console.log("[EmbeddedWidget] Received playground update:", data);
+                    setPlaygroundOverrides((prev) => ({
+                        ...prev,
+                        isPlayground: true,
+                        playgroundOverrides: {
+                            systemPrompt: data.systemPrompt,
+                            model: data.model,
+                            temperature: data.temperature,
+                            chatbotId: data.chatbotId,
+                        },
+                        // Update display name/initial message if provided in data
+                        brandName: data.brandName,
+                        greeting: data.greeting,
+                    }));
+                }
+            },
+            {
+                type: "widget:config_update",
+                handler: (data: any) => {
+                    // console.log("[EmbeddedWidget] Received config update:", data);
+                    setPlaygroundOverrides((prev) => ({
+                        ...prev,
+                        ...data
+                    }));
+                }
+            }
+        ]
+    });
 
     // Loading state - show spinner
     if (loading) {

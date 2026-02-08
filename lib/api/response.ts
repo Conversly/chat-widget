@@ -32,30 +32,8 @@ export const responseFetch = axios.create({
   withCredentials: true,
 });
 
-responseFetch.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const vid = getStoredVisitorId();
-    if (vid) {
-      config.headers = config.headers || {};
-      // Don't override if caller set it explicitly.
-      if (!(VISITOR_ID_HEADER.toLowerCase() in (config.headers as any))) {
-        (config.headers as any)[VISITOR_ID_HEADER] = vid;
-      }
-    }
-    return config;
-  },
-  (error: unknown) => {
-    return Promise.reject(error);
-  },
-);
-
-responseFetch.interceptors.response.use((res) => {
-  const headerVal = (res.headers as any)?.["x-visitor-id"];
-  if (typeof headerVal === "string" && headerVal.trim()) {
-    setStoredVisitorId(headerVal);
-  }
-  return res;
-});
+// REMOVED: Interceptors that relied on global storage.
+// Identity headers (X-Visitor-Id, X-Chatbot-Id) are now injected per-request.
 
 function asApiErrorFromResponseText(
   status: number,
@@ -88,13 +66,15 @@ export async function streamChatbotResponse(
   const base = (API.RESPONSE_BASE_URL || "").replace(/\/$/, "");
   const url = new URL(API.ENDPOINTS.RESPONSE.STREAM(), `${base}/`).toString();
 
-  const existingVisitorId = getStoredVisitorId();
+  const chatbotId = requestBody.chatbotId; // Must be present now
+  const existingVisitorId = getStoredVisitorId(chatbotId);
   const res = await fetch(url, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/x-ndjson, application/json",
+      "x-verly-chatbot-id": chatbotId,
       ...(existingVisitorId ? { [VISITOR_ID_HEADER]: existingVisitorId } : {}),
     },
     body: JSON.stringify(requestBody),
@@ -102,9 +82,10 @@ export async function streamChatbotResponse(
   });
 
   // Persist visitor id ASAP so conversationId can be stored under the right key.
+  // Persist visitor id ASAP so conversationId can be stored under the right key.
   const headerVisitorId = res.headers.get(VISITOR_ID_HEADER);
   if (headerVisitorId && headerVisitorId.trim()) {
-    setStoredVisitorId(headerVisitorId);
+    setStoredVisitorId(chatbotId, headerVisitorId);
   }
 
   if (!res.ok) {
@@ -164,7 +145,7 @@ export async function streamChatbotResponse(
               const meta = event as Extract<ResponseStreamEvent, { type: "meta" }>;
               const vid = (meta as any)?.visitor_id;
               if (typeof vid === "string" && vid.trim()) {
-                setStoredVisitorId(vid);
+                setStoredVisitorId(chatbotId, vid);
               }
               callbacks.onMeta?.(meta);
               break;
@@ -239,12 +220,17 @@ export async function streamPlaygroundResponse(
   const base = (API.RESPONSE_BASE_URL || "").replace(/\/$/, "");
   const url = new URL(API.ENDPOINTS.RESPONSE.PLAYGROUND_STREAM(), `${base}/`).toString();
 
+  const chatbotId = requestBody.chatbotId;
+  const existingVisitorId = getStoredVisitorId(chatbotId);
+
   const res = await fetch(url, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/x-ndjson, application/json",
+      "x-verly-chatbot-id": chatbotId,
+      ...(existingVisitorId ? { [VISITOR_ID_HEADER]: existingVisitorId } : {}),
     },
     body: JSON.stringify(requestBody),
     signal,
@@ -377,6 +363,7 @@ export async function streamPlaygroundResponse(
 export const getChatbotResponse = async (
   messages: ChatMessage[],
   user: ChatbotResponseRequest["user"],
+  chatbotId: string,
   mode: string = "default",
   metadata?: ChatbotResponseRequest["metadata"],
   conversationId?: ChatbotResponseRequest["conversationId"],
@@ -412,14 +399,28 @@ export const getChatbotResponse = async (
     user,
     metadata,
     conversationId,
+    chatbotId,
   };
 
-  let res: ChatbotResponseData;
+  const existingVisitorId = getStoredVisitorId(chatbotId);
+  let resData: ChatbotResponseData;
+
   try {
-    res = await responseFetch(API.ENDPOINTS.RESPONSE.BASE_URL(), {
+    const res = await responseFetch(API.ENDPOINTS.RESPONSE.BASE_URL(), {
       method: "POST",
       data: requestBody,
-    }).then((res: AxiosResponse<ChatbotResponseData>) => res.data);
+      headers: {
+        "x-verly-chatbot-id": chatbotId,
+        ...(existingVisitorId ? { [VISITOR_ID_HEADER]: existingVisitorId } : {}),
+      },
+    });
+
+    const headerVisitorId = res.headers[VISITOR_ID_HEADER.toLowerCase()];
+    if (typeof headerVisitorId === "string" && headerVisitorId.trim()) {
+      setStoredVisitorId(chatbotId, headerVisitorId);
+    }
+
+    resData = res.data;
   } catch (err: unknown) {
     if (axios.isAxiosError(err)) {
       const status = err.response?.status;
@@ -432,11 +433,11 @@ export const getChatbotResponse = async (
     throw err;
   }
 
-  if (!res.success) {
+  if (!resData.success) {
     throw new ResponseServiceApiError({ error: "unsuccessful_response", message: "Failed to get chatbot response" });
   }
 
-  return res;
+  return resData;
 };
 
 /**
@@ -477,15 +478,28 @@ export const getPlaygroundResponse = async (
     conversationId,
   };
 
-  let res: ChatbotResponseData;
+  const existingVisitorId = getStoredVisitorId(chatbotId);
+  let resData: ChatbotResponseData;
+
   try {
-    res = await responseFetch(
+    const res = await responseFetch(
       API.ENDPOINTS.RESPONSE.PLAYGROUND(),
       {
         method: "POST",
         data: requestBody,
+        headers: {
+          "x-verly-chatbot-id": chatbotId,
+          ...(existingVisitorId ? { [VISITOR_ID_HEADER]: existingVisitorId } : {}),
+        },
       },
-    ).then((res: AxiosResponse<ChatbotResponseData>) => res.data);
+    );
+
+    const headerVisitorId = res.headers[VISITOR_ID_HEADER.toLowerCase()];
+    if (typeof headerVisitorId === "string" && headerVisitorId.trim()) {
+      setStoredVisitorId(chatbotId, headerVisitorId);
+    }
+
+    resData = res.data;
   } catch (err: unknown) {
     if (axios.isAxiosError(err)) {
       const status = err.response?.status;
@@ -498,11 +512,11 @@ export const getPlaygroundResponse = async (
     throw err;
   }
 
-  if (!res.success) {
+  if (!resData.success) {
     throw new ResponseServiceApiError({ error: "unsuccessful_response", message: "Failed to get playground response" });
   }
 
-  return res;
+  return resData;
 };
 
 /**

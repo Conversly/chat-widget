@@ -16,6 +16,7 @@ function EmbedContent() {
 
     const chatbotId = params.chatbotId as string;
     const testing = searchParams.get("testing") === "true";
+    const playground = searchParams.get("playground") === "true";
 
     // Force transparent background for the embed page
     if (typeof document !== 'undefined') {
@@ -38,7 +39,7 @@ function EmbedContent() {
         );
     }
 
-    return <EmbeddedWidget chatbotId={chatbotId} testing={testing} />;
+    return <EmbeddedWidget chatbotId={chatbotId} testing={testing} playground={playground} />;
 }
 
 export default function EmbedPage() {

@@ -24,14 +24,20 @@ export const terminalFetch = axios.create({
  */
 export async function listVisitorConversations(
   visitorId: string,
+  chatbotId: string,
 ): Promise<TerminalVisitorConversationItem[]> {
   const vid = (visitorId || "").trim();
+  const botId = (chatbotId || "").trim();
   if (!vid) return [];
 
   const res = await terminalFetch.get<
     ApiResponse<TerminalVisitorConversationsPayload, Error>
   >(API.ENDPOINTS.TERMINAL.ACTIVITY.CONVERSATIONS_BY_VISITOR(), {
     params: { visitorId: vid },
+    headers: {
+      "x-verly-chatbot-id": botId,
+      "x-verly-visitor-id": vid,
+    }
   });
 
   if (!res.data.success) {
@@ -143,6 +149,7 @@ export async function getChatHistory(
     const raw = await terminalFetch
       .get(API.ENDPOINTS.TERMINAL.ACTIVITY.HISTORY(), {
         params: { conversationId: cid, chatbotId: botId },
+        headers: { "x-verly-chatbot-id": botId },
       })
       .then((res: AxiosResponse<unknown>) => res.data);
 

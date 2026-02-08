@@ -9,7 +9,7 @@ import { HomeView } from "./HomeView";
 import { MessagesView } from "./MessagesView";
 import { ChatView } from "./ChatView";
 import { usePostMessage } from "@/hooks/usePostMessage";
-import { streamChatbotResponse, submitFeedback } from "@/lib/api/response";
+import { streamChatbotResponse, submitFeedback, streamPlaygroundResponse } from "@/lib/api/response";
 import { getChatHistory, listVisitorConversations } from "@/lib/api/activity";
 import { useChat, type ChatStatus, type ChatMessage as StateChatMessage } from "@/hooks/use-chat-state";
 import { getStoredVisitorId, getStoredConversationId, setStoredConversationId } from "@/lib/storage";
@@ -157,7 +157,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
         const client = wsClientRef.current;
         if (!client) return;
 
-        const convId = conversationId || getStoredConversationId();
+        const convId = conversationId || getStoredConversationId(config.chatbotId || "");
         const shouldConnect = !!convId && !!escalation;
 
         if (!shouldConnect) {
@@ -326,7 +326,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
 
     const handleStartNewConversation = useCallback(() => {
         // Force response-service to create a fresh conversation.
-        setStoredConversationId(null);
+        setStoredConversationId(config.chatbotId || "", null);
         setConversationId(null);
         setEscalation(null);
         setIsHumanActive(false);
@@ -369,7 +369,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
         setStatus("submitted");
 
         // Persist selection as "current" conversation.
-        setStoredConversationId(conversation.id);
+        setStoredConversationId(config.chatbotId || "", conversation.id);
         setConversationId(conversation.id);
         setIsHumanActive(false);
         setAssignedAgent({ displayName: null, avatarUrl: null });
@@ -421,14 +421,14 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
 
     const refreshConversations = useCallback(async () => {
         if (typeof window === "undefined") return;
-        const visitorId = getStoredVisitorId();
+        const visitorId = getStoredVisitorId(config.chatbotId || "");
         if (!visitorId) {
             setConversations([]);
             return;
         }
 
         try {
-            const items = await listVisitorConversations(visitorId);
+            const items = await listVisitorConversations(visitorId, config.chatbotId || "");
             const mapped: Conversation[] = items.map((c) => {
                 const tsRaw = c.lastUserMessageAt || c.lastMessageAt || c.createdAt;
                 const ts = new Date(tsRaw);
@@ -489,83 +489,149 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                 content: m.content,
             }));
 
-            const requestBody = {
-                query: JSON.stringify(chatMessages),
-                mode: "default",
-                user: {
-                    uniqueClientId: config.uniqueClientId,
-                    converslyWebId: config.converslyWebId,
-                    metadata: {},
-                },
-                metadata: {
-                    originUrl: typeof window !== "undefined" ? window.location.href : undefined,
-                },
-                conversationId: getStoredConversationId() || undefined,
-            };
+            if (config.isPlayground && config.playgroundOverrides) {
+                // Use playground endpoint
+                const requestBody = {
+                    query: JSON.stringify(chatMessages),
+                    mode: "default",
+                    chatbot: {
+                        chatbotId: config.playgroundOverrides.chatbotId || config.chatbotId || "",
+                        chatbotSystemPrompt: config.playgroundOverrides.systemPrompt || "",
+                        chatbotModel: config.playgroundOverrides.model || "gemini-2.0",
+                        chatbotTemperature: config.playgroundOverrides.temperature || 0.7,
+                    },
+                    chatbotId: config.playgroundOverrides.chatbotId || config.chatbotId || "",
+                    user: {
+                        uniqueClientId: config.uniqueClientId,
+                        converslyWebId: config.converslyWebId,
+                        metadata: {},
+                    },
+                    metadata: {
+                        originUrl: typeof window !== "undefined" ? window.location.href : undefined,
+                    },
+                    conversationId: getStoredConversationId(config.chatbotId || "") || undefined,
+                };
 
-            await streamChatbotResponse(requestBody, {
-                onMeta: (meta) => {
-                    if (meta.conversation_id) {
-                        const convId = meta.conversation_id;
-                        setStoredConversationId(convId);
-                        setConversationId(convId);
-                        // If we were in a "new chat" placeholder, update the active conversation id.
-                        setActiveConversation((prev) =>
-                            prev ? { ...prev, id: convId } : prev
-                        );
-                    }
-                },
-                onControl: (escalate, reason) => {
-                    // Early escalation hint: connect WS ASAP (final response is authoritative).
-                    if (escalate) {
-                        setEscalation({ id: "pending", status: "REQUESTED", reason });
-                    }
-                },
-                onDelta: (_delta, accumulated) => {
-                    updateMessage(assistantMessageId, { content: accumulated });
-                },
-                onFinal: (response) => {
-                    if (response.conversation_id) {
-                        const convId = response.conversation_id;
-                        setStoredConversationId(convId);
-                        setConversationId(convId);
-                        setActiveConversation((prev) =>
-                            prev ? { ...prev, id: convId } : prev
-                        );
-                    }
+                await streamPlaygroundResponse(requestBody, {
+                    onMeta: (meta) => {
+                        if (meta.conversation_id) {
+                            const convId = meta.conversation_id;
+                            setStoredConversationId(config.chatbotId || "", convId);
+                            setConversationId(convId);
+                            setActiveConversation((prev) =>
+                                prev ? { ...prev, id: convId } : prev
+                            );
+                        }
+                    },
+                    onDelta: (_delta, accumulated) => {
+                        updateMessage(assistantMessageId, { content: accumulated });
+                    },
+                    onFinal: (response) => {
+                        if (response.conversation_id) {
+                            const convId = response.conversation_id;
+                            setStoredConversationId(config.chatbotId || "", convId);
+                            setConversationId(convId);
+                            setActiveConversation((prev) =>
+                                prev ? { ...prev, id: convId } : prev
+                            );
+                        }
 
-                    // Authoritative escalation flag
-                    if (response.escalation && shouldConnectWsForEscalationStatus(response.escalation.status)) {
-                        setEscalation(response.escalation);
-                    } else if (response.escalation) {
-                        // Escalation object exists but status isn't in the connect set; still treat as escalated.
-                        setEscalation(response.escalation);
-                    } else {
-                        setEscalation(null);
-                    }
+                        updateMessage(assistantMessageId, {
+                            content: response.response,
+                            status: "delivered",
+                        });
+                        setStatus("ready");
+                    },
+                    onError: (error) => {
+                        console.error("[ChatWidget] Playground Stream error:", error);
+                        updateMessage(assistantMessageId, {
+                            content: "Sorry, there was an error. Please try again.",
+                            status: "error",
+                        });
+                        setStatus("error");
+                    },
+                });
+            } else {
+                // Use standard endpoint
+                const requestBody = {
+                    query: JSON.stringify(chatMessages),
+                    mode: "default",
+                    user: {
+                        uniqueClientId: config.uniqueClientId,
+                        converslyWebId: config.converslyWebId,
+                        metadata: {},
+                    },
+                    metadata: {
+                        originUrl: typeof window !== "undefined" ? window.location.href : undefined,
+                    },
+                    conversationId: getStoredConversationId(config.chatbotId || "") || undefined,
+                    chatbotId: config.chatbotId || "",
+                };
 
-                    // If backend says escalation is HUMAN_ACTIVE, stop routing to LLM from now on.
-                    if (shouldRouteMessagesToHuman(response.escalation?.status)) {
-                        setIsHumanActive(true);
-                    }
+                await streamChatbotResponse(requestBody, {
+                    onMeta: (meta) => {
+                        if (meta.conversation_id) {
+                            const convId = meta.conversation_id;
+                            setStoredConversationId(config.chatbotId || "", convId);
+                            setConversationId(convId);
+                            // If we were in a "new chat" placeholder, update the active conversation id.
+                            setActiveConversation((prev) =>
+                                prev ? { ...prev, id: convId } : prev
+                            );
+                        }
+                    },
+                    onControl: (escalate, reason) => {
+                        // Early escalation hint: connect WS ASAP (final response is authoritative).
+                        if (escalate) {
+                            setEscalation({ id: "pending", status: "REQUESTED", reason });
+                        }
+                    },
+                    onDelta: (_delta, accumulated) => {
+                        updateMessage(assistantMessageId, { content: accumulated });
+                    },
+                    onFinal: (response) => {
+                        if (response.conversation_id) {
+                            const convId = response.conversation_id;
+                            setStoredConversationId(config.chatbotId || "", convId);
+                            setConversationId(convId);
+                            setActiveConversation((prev) =>
+                                prev ? { ...prev, id: convId } : prev
+                            );
+                        }
 
-                    updateMessage(assistantMessageId, {
-                        content: response.response,
-                        status: "delivered",
-                        responseId: response.responseId,
-                    });
-                    setStatus("ready");
-                    void refreshConversations();
-                },
-                onError: (error) => {
-                    console.error("[ChatWidget] Stream error:", error);
-                    updateMessage(assistantMessageId, {
-                        content: "Sorry, there was an error. Please try again.",
-                        status: "error",
-                    });
-                    setStatus("error");
-                },
-            });
+                        // Authoritative escalation flag
+                        if (response.escalation && shouldConnectWsForEscalationStatus(response.escalation.status)) {
+                            setEscalation(response.escalation);
+                        } else if (response.escalation) {
+                            // Escalation object exists but status isn't in the connect set; still treat as escalated.
+                            setEscalation(response.escalation);
+                        } else {
+                            setEscalation(null);
+                        }
+
+                        // If backend says escalation is HUMAN_ACTIVE, stop routing to LLM from now on.
+                        if (shouldRouteMessagesToHuman(response.escalation?.status)) {
+                            setIsHumanActive(true);
+                        }
+
+                        updateMessage(assistantMessageId, {
+                            content: response.response,
+                            status: "delivered",
+                            responseId: response.responseId,
+                        });
+                        setStatus("ready");
+                        void refreshConversations();
+                    },
+                    onError: (error) => {
+                        console.error("[ChatWidget] Stream error:", error);
+                        updateMessage(assistantMessageId, {
+                            content: "Sorry, there was an error. Please try again.",
+                            status: "error",
+                        });
+                        setStatus("error");
+                    },
+                });
+            }
         } catch (error) {
             console.error("[ChatWidget] API error:", error);
             updateMessage(assistantMessageId, {

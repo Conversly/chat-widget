@@ -153,6 +153,13 @@ export interface WidgetConfig {
     converslyWebId?: string;
     uniqueClientId?: string;
     testing?: boolean;
+    isPlayground?: boolean;
+    playgroundOverrides?: {
+        systemPrompt?: string;
+        model?: string;
+        temperature?: number;
+        chatbotId?: string;
+    };
 }
 
 export type UIConfigInput = WidgetConfig & {

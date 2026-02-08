@@ -22,6 +22,9 @@ export const getWidgetConfig = async (chatbotId: string | number): Promise<GetWi
 		{
 			params: {
 				chatbotId: String(chatbotId)
+			},
+			headers: {
+				"x-verly-chatbot-id": String(chatbotId)
 			}
 		}
 	);

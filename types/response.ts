@@ -21,6 +21,7 @@ export interface ChatbotResponseRequest {
   user: ResponseUser;
   metadata?: ResponseRequestMetadata;
   conversationId?: string;
+  chatbotId: string;
 }
 
 export interface ChatbotResponseData {
