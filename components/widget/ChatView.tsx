@@ -164,10 +164,10 @@ export function ChatView({
                     </button>
                     <div className="flex items-center gap-2">
                         {/* Agent avatar */}
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
-                            {conversation.agent.avatar || config.botAvatar || config.widgetIcon ? (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br bg-white flex items-center justify-center text-white text-sm font-medium overflow-hidden">
+                            {config.brandLogo ? (
                                 <img
-                                    src={conversation.agent.avatar || config.botAvatar || config.widgetIcon}
+                                    src={config.brandLogo}
                                     alt={conversation.agent.name}
                                     className="w-full h-full object-cover"
                                 />

@@ -125,10 +125,10 @@ export function MessagesView({
                                 )}
                             >
                                 {/* Agent Avatar */}
-                                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-300 flex-shrink-0">
-                                    {conversation.agent.avatar ? (
+                                <div className="w-10 h-10 rounded-full overflow-hidden bg-white flex-shrink-0">
+                                    {config.brandLogo ? (
                                         <img
-                                            src={conversation.agent.avatar}
+                                            src={config.brandLogo}
                                             alt={conversation.agent.name}
                                             className="w-full h-full object-cover"
                                         />
@@ -217,3 +217,5 @@ export function MessagesView({
         </div>
     );
 }
+
+
