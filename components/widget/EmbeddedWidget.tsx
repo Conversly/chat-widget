@@ -85,7 +85,7 @@ export function EmbeddedWidget({ chatbotId, testing = false, playground = false 
                     return;
                 }
 
-                const response = await getWidgetConfig(chatbotId);
+                const response = await getWidgetConfig(chatbotId, playground);
                 // console.log("[ChatWidget] Received config:", response);
 
                 // Transform API response to WidgetConfig format
@@ -231,6 +231,6 @@ export function EmbeddedWidget({ chatbotId, testing = false, playground = false 
         );
     }
 
-    return <ChatWidget config={config} />;
+    return <ChatWidget config={config} defaultOpen={true} />;
 }
 

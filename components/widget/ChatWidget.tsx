@@ -18,10 +18,12 @@ import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "@/types/w
 import { SOUNDS } from "@/lib/config/sounds";
 import { createLead } from "@/lib/api/leads";
 import { MAXIMIZE_WIDTH_SCALE_FACTOR, MAXIMIZE_HEIGHT_SCALE_FACTOR } from "@/lib/constants";
+import { useWidgetSound } from "@/hooks/use-widget-sound";
 
 interface ChatWidgetProps {
     config: WidgetConfig;
     className?: string;
+    defaultOpen?: boolean;
 }
 
 // Default demo config
@@ -41,10 +43,10 @@ const defaultConfig: WidgetConfig = {
     popupSoundEnabled: true,
 };
 
-export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProps) {
+export function ChatWidget({ config = defaultConfig, className, defaultOpen = false }: ChatWidgetProps) {
     const [currentView, setCurrentView] = useState<WidgetView>("home");
     // Track if the widget is currently visible (open) in the parent page
-    const [isWidgetOpen, setIsWidgetOpen] = useState(false);
+    const [isWidgetOpen, setIsWidgetOpen] = useState(defaultOpen);
     const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [conversationId, setConversationId] = useState<string | null>(null);
@@ -234,22 +236,18 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
         return () => clearTimeout(timer);
     }, [config.autoShowInitial, config.autoShowDelaySec, postToHost]);
 
-    // Sound Logic
-    const audioRef = useRef<HTMLAudioElement | null>(null);
-    useEffect(() => {
-        // Initialize audio
-        audioRef.current = new Audio(config.popupSoundUrl || SOUNDS.POPUP);
-    }, [config.popupSoundUrl]);
+    // // Sound Logic
+    // // Sound Logic
+    // useWidgetSound({
+    //     messages,
+    //     isWidgetOpen,
+    //     soundEnabled: config.popupSoundEnabled ?? false,
+    //     soundUrl: config.popupSoundUrl,
+    // });
 
-    // Track if history is loaded to avoid playing sound on initial load
-    const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
+    // Notification Logic (PostMessage only)
     const lastProcessedMessageId = useRef<string | null>(null);
     const lastProcessedMessageContent = useRef<string | null>(null);
-
-    useEffect(() => {
-        // Initialize audio
-        audioRef.current = new Audio(config.popupSoundUrl || SOUNDS.POPUP);
-    }, [config.popupSoundUrl]);
 
     useEffect(() => {
         // Check if last message is from agent and is new (simple check via length or ID)
@@ -261,16 +259,10 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
             const isNewId = lastProcessedMessageId.current !== lastMsg.id;
             const isContentChanged = lastProcessedMessageContent.current !== lastMsg.content;
 
-            // If widget is closed, notify parent to show popup and play sound
+            // If widget is closed, notify parent to show popup
             // BUT only if something actually changed (ID or Content)
             if (!isWidgetOpen) {
                 if (isNewId || isContentChanged) {
-                    // SOUND: Only play sound if this is a NEW message ID
-                    // AND history is loaded (silences initial load)
-                    if (isNewId && (config.popupSoundEnabled !== false) && isHistoryLoaded) {
-                        audioRef.current?.play().catch(e => console.error("Audio play failed", e));
-                    }
-
                     // NOTIFICATION: Update popup if content changed or it's a new message
                     postToHost("widget:notify", {
                         text: lastMsg.content || "New message"
@@ -287,15 +279,8 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                 lastProcessedMessageContent.current = lastMsg.content;
             }
         }
-    }, [messages, config.popupSoundEnabled, isWidgetOpen, postToHost, isHistoryLoaded]);
+    }, [messages, isWidgetOpen, postToHost]);
 
-    // Mark history as loaded after first message update or if no messages
-    useEffect(() => {
-        if (messages.length > 0 || status === 'ready') {
-            const timer = setTimeout(() => setIsHistoryLoaded(true), 1000);
-            return () => clearTimeout(timer);
-        }
-    }, [messages.length, status]);
 
     // State for UI interactions
     const [isMaximized, setIsMaximized] = useState(false);
