@@ -12,7 +12,7 @@ import { usePostMessage } from "@/hooks/usePostMessage";
 import { streamChatbotResponse, submitFeedback, streamPlaygroundResponse } from "@/lib/api/response";
 import { getChatHistory, listVisitorConversations } from "@/lib/api/activity";
 import { useChat, type ChatStatus, type ChatMessage as StateChatMessage } from "@/hooks/use-chat-state";
-import { getStoredVisitorId, getStoredConversationId, setStoredConversationId, getStoredLeadGenerated, setStoredLeadGenerated } from "@/lib/storage";
+import { getStoredVisitorId, getStoredConversationId, setStoredConversationId, getStoredLeadGenerated, setStoredLeadGenerated, getStoredLead, setStoredLead } from "@/lib/storage";
 import { WidgetWebSocketClient } from "@/store/widget-websocket-client";
 import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "@/types/websocket";
 import { SOUNDS } from "@/lib/config/sounds";
@@ -351,9 +351,14 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
         // Add greeting if configured
         if (config.greeting) {
+            const storedLead = getStoredLead(config.chatbotId || "");
+            const greeting = storedLead?.name
+                ? `Hi ${storedLead.name}, ${config.greeting.charAt(0).toLowerCase() + config.greeting.slice(1)}`
+                : config.greeting;
+
             addMessage({
                 role: "assistant",
-                content: config.greeting,
+                content: greeting,
                 status: "delivered",
             });
         }
@@ -393,14 +398,20 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                 setMessages(mapped as any);
             } else if (config.greeting) {
                 // If the conversation exists but has no stored messages yet, show greeting.
+                const storedLead = getStoredLead(config.chatbotId || "");
+                const greeting = storedLead?.name
+                    ? `Hi ${storedLead.name}, ${config.greeting.charAt(0).toLowerCase() + config.greeting.slice(1)}`
+                    : config.greeting;
+
                 setMessages([{
                     id: "initial-assistant",
                     role: "assistant",
-                    content: config.greeting,
+                    content: greeting,
                     createdAt: new Date(),
                     status: "delivered" as const,
                 }] as any);
             }
+
             setStatus("ready");
 
             // If history indicates escalation is requested/active, connect WS immediately.
@@ -485,11 +496,19 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         try {
             // Convert messages to backend format
             const chatMessages: ApiChatMessage[] = history.map((m) => ({
-                role: (m.role === "agent" ? "assistant" : m.role) as "user" | "assistant",
+                role: (m.role === "agent" ? "assistant" : m.role) as "user" | "assistant" | "system",
                 content: m.content,
             }));
 
-            if (config.isPlayground && config.playgroundOverrides) {
+            // Inject lead context if available and not already present (checking message text just in case)
+            const storedLead = getStoredLead(config.chatbotId || "");
+            if (storedLead?.name) {
+                // Add system message to the beginning of the context
+                chatMessages.unshift({
+                    role: "system",
+                    content: `User name: ${storedLead.name}`
+                });
+            } if (config.isPlayground && config.playgroundOverrides) {
                 // Use playground endpoint
                 const requestBody = {
                     query: JSON.stringify(chatMessages),
@@ -752,9 +771,14 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         clearMessages();
 
         if (config.greeting) {
+            const storedLead = getStoredLead(config.chatbotId || "");
+            const greeting = storedLead?.name
+                ? `Hi ${storedLead.name}, ${config.greeting.charAt(0).toLowerCase() + config.greeting.slice(1)}`
+                : config.greeting;
+
             addMessage({
                 role: "assistant",
-                content: config.greeting,
+                content: greeting,
                 status: "delivered",
             });
         }
@@ -794,6 +818,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             });
 
             setStoredLeadGenerated(config.chatbotId);
+            setStoredLead(config.chatbotId, { name: data.name, email: data.email, phone: data.phone });
             setShowLeadForm(false);
 
             // Optional: Add a system message or toast

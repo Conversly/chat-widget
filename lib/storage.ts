@@ -9,6 +9,7 @@ function getStorageKey(chatbotId: string, clientKey: string) {
 const KEYS = {
     VISITOR_ID: "visitorId",
     CONVERSATION_ID: "conversationId",
+    LEAD: "lead", // New key for lead info
 }
 
 export function getStoredVisitorId(chatbotId: string): string | null {
@@ -87,6 +88,34 @@ export function setStoredLeadGenerated(chatbotId: string): void {
     const key = `verly:lead_generated:${chatbotId}`
     try {
         window.localStorage.setItem(key, "true")
+    } catch {
+        // ignore
+    }
+}
+
+export interface StoredLead {
+    name: string
+    email: string
+    phone?: string
+}
+
+export function getStoredLead(chatbotId: string): StoredLead | null {
+    if (typeof window === "undefined" || !chatbotId) return null
+    try {
+        const key = getStorageKey(chatbotId, KEYS.LEAD)
+        const v = window.localStorage.getItem(key)
+        if (!v) return null
+        return JSON.parse(v) as StoredLead
+    } catch {
+        return null
+    }
+}
+
+export function setStoredLead(chatbotId: string, lead: StoredLead): void {
+    if (typeof window === "undefined" || !chatbotId) return
+    const key = getStorageKey(chatbotId, KEYS.LEAD)
+    try {
+        window.localStorage.setItem(key, JSON.stringify(lead))
     } catch {
         // ignore
     }
