@@ -153,6 +153,8 @@ export function ChatView({
 
     return (
         <div className="h-full flex flex-col bg-white">
+
+
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <div className="flex items-center gap-3">
@@ -265,9 +267,10 @@ export function ChatView({
 
             {/* Messages Area - Using our new Conversation component */}
             <ConversationContainer
-                className="flex-1 relative"
+                className="flex-1 relative chat-scrollbar-container"
                 messages={messages}
                 scrollButton={<ConversationScrollButton />}
+                style={{ '--chat-scrollbar-color': '#f3f4f6' } as React.CSSProperties}
             >
                 <ConversationContent>
                     {groupedMessages.map((group, groupIndex) => (
