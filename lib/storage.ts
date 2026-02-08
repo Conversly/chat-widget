@@ -71,3 +71,23 @@ export function setStoredConversationId(chatbotId: string, conversationId: strin
         // ignore
     }
 }
+
+export function getStoredLeadGenerated(chatbotId: string): boolean {
+    if (typeof window === "undefined" || !chatbotId) return false
+    try {
+        const key = `verly:lead_generated:${chatbotId}`
+        return window.localStorage.getItem(key) === "true"
+    } catch {
+        return false
+    }
+}
+
+export function setStoredLeadGenerated(chatbotId: string): void {
+    if (typeof window === "undefined" || !chatbotId) return
+    const key = `verly:lead_generated:${chatbotId}`
+    try {
+        window.localStorage.setItem(key, "true")
+    } catch {
+        // ignore
+    }
+}

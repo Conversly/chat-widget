@@ -75,12 +75,9 @@ export function HomeView({
 
                 {/* Greeting */}
                 <div className="text-white relative z-10">
-                    <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-                        Hi there <span className="animate-wave origin-bottom-right inline-block">👋</span>
+                    <h1 className="text-3xl font-bold flex items-center gap-2">
+                        {config.greeting || <>Hi there <span className="animate-wave origin-bottom-right inline-block">👋</span></>}
                     </h1>
-                    <h2 className="text-xl font-semibold opacity-95">
-                        {config.greeting || "How can we help?"}
-                    </h2>
                 </div>
             </div>
 
@@ -134,18 +131,20 @@ export function HomeView({
                 )}
 
                 {/* Send us a message Card */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <button
+                    onClick={onStartConversation}
+                    className="w-full text-left bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group"
+                >
                     <div className="flex items-start justify-between mb-3">
                         <h3 className="font-bold text-gray-900">
                             Send us a message
                         </h3>
-                        <button
-                            onClick={onStartConversation}
-                            className="w-8 h-8 flex items-center justify-center rounded-full text-white transition-transform hover:scale-105 active:scale-95 shadow-md"
+                        <div
+                            className="w-8 h-8 flex items-center justify-center rounded-full text-white transition-transform group-hover:scale-105 shadow-md"
                             style={{ backgroundColor: config.primaryColor }}
                         >
                             <Send className="w-4 h-4 ml-0.5" />
-                        </button>
+                        </div>
                     </div>
 
                     <p className="text-sm text-gray-500 leading-relaxed mb-4">
@@ -154,26 +153,11 @@ export function HomeView({
 
                     {/* Footer / Avatars */}
                     <div className="flex items-center gap-2">
-                        {config.showAgentAvatars && config.agents && config.agents.length > 0 ? (
-                            <div className="flex -space-x-2 overflow-hidden mr-2">
-                                {config.agents.slice(0, 3).map((agent, i) => (
-                                    <div key={i} className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-100 overflow-hidden">
-                                        {agent.avatar ? (
-                                            <img src={agent.avatar} alt={agent.name} className="h-full w-full object-cover" />
-                                        ) : (
-                                            <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-gray-500">
-                                                {agent.name.charAt(0)}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        ) : null}
                         <span className="text-xs text-gray-400">
                             Typically replies in under 5 mins
                         </span>
                     </div>
-                </div>
+                </button>
 
                 {/* Suggested Messages */}
                 {config.suggestedMessages && config.suggestedMessages.length > 0 && (

@@ -97,3 +97,6 @@ export const UI_TEXT = {
 
 
 } as const;
+
+export const MAXIMIZE_WIDTH_SCALE_FACTOR = 1.1;
+export const MAXIMIZE_HEIGHT_SCALE_FACTOR = 1.25;

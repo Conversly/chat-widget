@@ -48,6 +48,7 @@ export interface ChatbotResponseData {
     converslyWebId?: string;
     uniqueClientId?: string;
   };
+  lead_generation?: boolean;
 }
 
 export interface FeedbackRequest {

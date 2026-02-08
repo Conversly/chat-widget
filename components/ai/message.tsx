@@ -10,9 +10,10 @@ import { MarkdownRenderer } from "@/components/widget/markdown-renderer";
 interface MessageProps extends React.HTMLAttributes<HTMLDivElement> {
     from: "user" | "assistant" | "system";
     children: React.ReactNode;
+    onBubbleClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
-export function Message({ from, children, className, ...props }: MessageProps) {
+export function Message({ from, children, className, onBubbleClick, ...props }: MessageProps) {
     return (
         <div
             className={cn(
@@ -23,8 +24,10 @@ export function Message({ from, children, className, ...props }: MessageProps) {
             {...props}
         >
             <div
+                onClick={onBubbleClick}
                 className={cn(
                     "max-w-full rounded-2xl px-4 py-3",
+                    onBubbleClick && "cursor-pointer",
                     from === "user"
                         ? "bg-black text-white rounded-br-md"
                         : "bg-gray-100 text-gray-900 rounded-bl-md"

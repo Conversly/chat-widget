@@ -24,6 +24,8 @@ import {
 import { ChatInput } from "./ChatInput";
 import { MessageActions } from "./MessageActions";
 
+import { LeadGenerationForm } from "./LeadGenerationForm";
+
 export interface AssignedAgentInfo {
     displayName: string | null;
     avatarUrl: string | null;
@@ -46,6 +48,9 @@ interface ChatViewProps {
     assignedAgent?: AssignedAgentInfo;
     onRegenerate?: (messageId: string) => void;
     onFeedback?: (messageId: string, type: "positive" | "negative") => void;
+    showLeadForm?: boolean;
+    onLeadSubmit?: (data: { name: string; email: string; phone?: string }) => Promise<void>;
+    onLeadDismiss?: () => void;
 }
 
 export function ChatView({
@@ -64,9 +69,24 @@ export function ChatView({
     assignedAgent,
     onRegenerate,
     onFeedback,
+    showLeadForm,
+    onLeadSubmit,
+    onLeadDismiss,
 }: ChatViewProps) {
     const [input, setInput] = useState("");
     const [showNotice, setShowNotice] = useState(true);
+    const [revealedMessageIds, setRevealedMessageIds] = useState<Set<string>>(new Set());
+
+    // Toggle message time visibility
+    const toggleMessageTime = (messageId: string) => {
+        const newSet = new Set(revealedMessageIds);
+        if (newSet.has(messageId)) {
+            newSet.delete(messageId);
+        } else {
+            newSet.add(messageId);
+        }
+        setRevealedMessageIds(newSet);
+    };
 
     // Handle submit
     const handleSubmit = (text: string) => {
@@ -156,18 +176,15 @@ export function ChatView({
                             )}
                         </div>
                         <div>
-                            <div className="font-medium text-gray-900 text-sm">
+                            <div className="font-semibold text-gray-900 text-sm">
                                 {conversation.agent.name}
                             </div>
-                            <div className="text-xs text-green-600 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                                {conversation.agent.status === "online" ? "Online" : "Away"}
-                            </div>
+
                         </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                             <button
                                 className="p-2 hover:bg-gray-100 rounded-full transition-colors outline-none"
@@ -176,7 +193,7 @@ export function ChatView({
                                 <MoreHorizontal className="w-5 h-5 text-gray-600" />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuContent align="end" className="w-56 bg-white text-gray-900 border border-gray-200 shadow-lg">
                             {onToggleMaximize && (
                                 <DropdownMenuItem onClick={onToggleMaximize}>
                                     {isMaximized ? (
@@ -269,7 +286,7 @@ export function ChatView({
                                 const agentAvatar = assignedAgent?.avatarUrl;
 
                                 return (
-                                    <div key={msg.id} className="mb-3">
+                                    <div className="mb-3">
                                         {/* Agent identity label (only for agent messages) */}
                                         {isAgent && (
                                             <div className="flex items-center gap-2 px-4 mb-1">
@@ -284,7 +301,10 @@ export function ChatView({
                                             </div>
                                         )}
 
-                                        <MessageBubble from={msg.role === "user" ? "user" : "assistant"}>
+                                        <MessageBubble
+                                            from={msg.role === "user" ? "user" : "assistant"}
+                                            onBubbleClick={() => toggleMessageTime(msg.id)}
+                                        >
                                             <MessageContent>
                                                 {msg.role === "assistant" || isAgent ? (
                                                     msg.content ? (
@@ -301,17 +321,19 @@ export function ChatView({
                                                 )}
                                             </MessageContent>
                                         </MessageBubble>
-                                        <div
-                                            className={cn(
-                                                "mt-1 px-4",
-                                                msg.role === "user" ? "text-right" : "text-left"
-                                            )}
-                                        >
-                                            <MessageTimestamp
-                                                date={msg.timestamp || new Date()}
-                                                format="time"
-                                            />
-                                        </div>
+                                        {(msg.id === messages[messages.length - 1]?.id || revealedMessageIds.has(msg.id)) && (
+                                            <div
+                                                className={cn(
+                                                    "mt-1 px-4",
+                                                    msg.role === "user" ? "text-right" : "text-left"
+                                                )}
+                                            >
+                                                <MessageTimestamp
+                                                    date={msg.timestamp || new Date()}
+                                                    format="time"
+                                                />
+                                            </div>
+                                        )}
 
                                         {/* Actions for Assistant Messages */}
                                         {(msg.role === "assistant" || isAgent) && msg.content && (
@@ -334,6 +356,42 @@ export function ChatView({
                             })}
                         </div>
                     ))}
+
+                    {/* Lead Generation Form as a Message Bubble */}
+                    {showLeadForm && onLeadSubmit && onLeadDismiss && (
+                        <div className="mb-3">
+                            {/* Avatar */}
+                            <div className="flex items-center gap-2 px-4 mb-1">
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-medium overflow-hidden shrink-0">
+                                    {(assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon) ? (
+                                        <img
+                                            src={assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon}
+                                            alt={assignedAgent?.displayName || "Agent"}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        (assignedAgent?.displayName || "A").charAt(0)
+                                    )}
+                                </div>
+                                <span className="text-xs font-medium text-gray-600">
+                                    {assignedAgent?.displayName || "Assistant"}
+                                </span>
+                            </div>
+
+                            <MessageBubble from="assistant">
+                                <MessageContent>
+                                    <LeadGenerationForm
+                                        config={config}
+                                        onSubmit={onLeadSubmit}
+                                        onDismiss={onLeadDismiss}
+                                    />
+                                </MessageContent>
+                            </MessageBubble>
+                            <div className="mt-1 px-4 text-left">
+                                <span className="text-[10px] text-gray-400">Just now</span>
+                            </div>
+                        </div>
+                    )}
                 </ConversationContent>
             </ConversationContainer>
 
@@ -354,6 +412,7 @@ export function ChatView({
                     <span className="text-xs text-gray-400">{config.footerText}</span>
                 </div>
             )}
+
         </div>
     );
 }

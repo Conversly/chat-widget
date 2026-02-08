@@ -12,10 +12,12 @@ import { usePostMessage } from "@/hooks/usePostMessage";
 import { streamChatbotResponse, submitFeedback, streamPlaygroundResponse } from "@/lib/api/response";
 import { getChatHistory, listVisitorConversations } from "@/lib/api/activity";
 import { useChat, type ChatStatus, type ChatMessage as StateChatMessage } from "@/hooks/use-chat-state";
-import { getStoredVisitorId, getStoredConversationId, setStoredConversationId } from "@/lib/storage";
+import { getStoredVisitorId, getStoredConversationId, setStoredConversationId, getStoredLeadGenerated, setStoredLeadGenerated } from "@/lib/storage";
 import { WidgetWebSocketClient } from "@/store/widget-websocket-client";
 import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "@/types/websocket";
 import { SOUNDS } from "@/lib/config/sounds";
+import { createLead } from "@/lib/api/leads";
+import { MAXIMIZE_WIDTH_SCALE_FACTOR, MAXIMIZE_HEIGHT_SCALE_FACTOR } from "@/lib/constants";
 
 interface ChatWidgetProps {
     config: WidgetConfig;
@@ -54,6 +56,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
     });
     const wsClientRef = useRef<WidgetWebSocketClient | null>(null);
     const wsRoomIdRef = useRef<string | null>(null);
+    const [showLeadForm, setShowLeadForm] = useState(false);
 
     // Use our new unified chat hook
     const {
@@ -304,21 +307,33 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
         setIsMaximized(newMaximized);
 
         if (newMaximized) {
+            // Determine base width and height to multiply by MAXIMIZE_SCALE_FACTOR
+            // Default base sizes: width 400px, height 700px
+            const baseWidthStr = config.chatWidth || "400px";
+            const baseHeightStr = config.chatHeight || "700px";
+
+            // Parse numeric values (assuming px or number)
+            const baseWidth = parseInt(baseWidthStr.toString().replace("px", ""), 10) || 400;
+            const baseHeight = parseInt(baseHeightStr.toString().replace("px", ""), 10) || 700;
+
+            const newWidth = Math.floor(baseWidth * MAXIMIZE_WIDTH_SCALE_FACTOR);
+            const newHeight = Math.floor(baseHeight * MAXIMIZE_HEIGHT_SCALE_FACTOR);
+
             postToHost("widget:resize", {
-                width: "100%",
-                height: "100%",
+                width: `${newWidth}px`,
+                height: `${newHeight}px`,
                 maxWidth: "100vw",
                 maxHeight: "100vh"
             });
         } else {
             postToHost("widget:resize", {
-                width: "400px",
-                height: "700px",
+                width: config.chatWidth || "400px",
+                height: config.chatHeight || "700px",
                 maxWidth: "calc(100vw - 40px)",
                 maxHeight: "calc(100vh - 120px)"
             });
         }
-    }, [isMaximized, postToHost]);
+    }, [isMaximized, postToHost, config.chatWidth, config.chatHeight]);
 
     const handleMute = useCallback(() => {
         setIsMuted(prev => !prev);
@@ -536,6 +551,14 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                             );
                         }
 
+                        // Check for lead generation trigger
+                        if (response.lead_generation) {
+                            const alreadyGenerated = getStoredLeadGenerated(config.chatbotId || "");
+                            if (!alreadyGenerated) {
+                                setShowLeadForm(true);
+                            }
+                        }
+
                         updateMessage(assistantMessageId, {
                             content: response.response,
                             status: "delivered",
@@ -612,6 +635,14 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                         // If backend says escalation is HUMAN_ACTIVE, stop routing to LLM from now on.
                         if (shouldRouteMessagesToHuman(response.escalation?.status)) {
                             setIsHumanActive(true);
+                        }
+
+                        // Check for lead generation trigger
+                        if (response.lead_generation) {
+                            const alreadyGenerated = getStoredLeadGenerated(config.chatbotId || "");
+                            if (!alreadyGenerated) {
+                                setShowLeadForm(true);
+                            }
                         }
 
                         updateMessage(assistantMessageId, {
@@ -756,6 +787,38 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
         setActiveConversation(null);
     };
 
+    const handleLeadSubmit = useCallback(async (data: { name: string; email: string; phone?: string }) => {
+        try {
+            const visitorId = getStoredVisitorId(config.chatbotId || "");
+            const convId = conversationId || getStoredConversationId(config.chatbotId || "");
+
+            if (!config.chatbotId || !convId) {
+                console.error("Missing ID for lead submission");
+                return;
+            }
+
+            await createLead({
+                chatbotId: config.chatbotId,
+                conversationId: convId,
+                name: data.name,
+                email: data.email,
+                phoneNumber: data.phone || "",
+                source: "WIDGET",
+                visitorId: visitorId || "",
+                // topicId can be inferred by backend or added if needed
+            });
+
+            setStoredLeadGenerated(config.chatbotId);
+            setShowLeadForm(false);
+
+            // Optional: Add a system message or toast
+            // addMessage({ role: "system", content: "Thanks! We'll be in touch soon." });
+        } catch (error) {
+            console.error("Failed to submit lead:", error);
+            throw error; // Re-throw to let form handle error state
+        }
+    }, [config.chatbotId, conversationId]);
+
     // Convert our ChatMessage to the widget Message type
     const widgetMessages: Message[] = messages.map((m) => ({
         id: m.id,
@@ -769,9 +832,12 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
     }));
 
     return (
-        <div className={cn(
-            "h-full w-full flex flex-col overflow-hidden text-left antialiased relative bg-white",
-        )}>
+        <div
+            className={cn(
+                "h-full w-full flex flex-col overflow-hidden text-left antialiased relative bg-white",
+            )}
+            style={{ backgroundColor: "white" }}
+        >
             {currentView === "home" && (
                 <HomeView
                     config={config}
@@ -802,18 +868,19 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                     messages={widgetMessages}
                     onSendMessage={handleSendMessage}
                     onBack={handleBackToMessages}
-                    status={status}
-                    assignedAgent={assignedAgent}
-                    onClose={() => {
-                        window.parent.postMessage({ type: "widget:close" }, "*");
-                    }}
+                    onClose={handleCloseWidget}
                     onToggleMaximize={handleToggleMaximize}
                     isMaximized={isMaximized}
                     onNewChat={handleStartNewConversation}
                     onMute={handleMute}
                     isMuted={isMuted}
-                    onRegenerate={handleRegenerate}
-                    onFeedback={handleFeedback}
+                    status={status}
+                    assignedAgent={assignedAgent}
+                    onRegenerate={config.regenerateMessages ? handleRegenerate : undefined}
+                    onFeedback={config.collectUserFeedback ? handleFeedback : undefined}
+                    showLeadForm={showLeadForm}
+                    onLeadSubmit={handleLeadSubmit}
+                    onLeadDismiss={() => setShowLeadForm(false)}
                 />
             )}
         </div>
