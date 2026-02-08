@@ -22,6 +22,7 @@ import {
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ChatInput } from "./ChatInput";
+import { MessageActions } from "./MessageActions";
 
 export interface AssignedAgentInfo {
     displayName: string | null;
@@ -43,6 +44,8 @@ interface ChatViewProps {
     status?: "ready" | "submitted" | "streaming" | "error";
     /** Agent identity from WS STATE_UPDATE, used for role:"agent" messages. */
     assignedAgent?: AssignedAgentInfo;
+    onRegenerate?: (messageId: string) => void;
+    onFeedback?: (messageId: string, type: "positive" | "negative") => void;
 }
 
 export function ChatView({
@@ -59,8 +62,11 @@ export function ChatView({
     isMuted,
     status = "ready",
     assignedAgent,
+    onRegenerate,
+    onFeedback,
 }: ChatViewProps) {
     const [input, setInput] = useState("");
+    const [showNotice, setShowNotice] = useState(true);
 
     // Handle submit
     const handleSubmit = (text: string) => {
@@ -225,6 +231,21 @@ export function ChatView({
                 </div>
             </div>
 
+            {/* Dismissable Notice */}
+            {config.dismissableNoticeText && showNotice && (
+                <div className="bg-blue-50 px-4 py-2 flex items-start justify-between gap-2 border-b border-blue-100">
+                    <p className="text-xs text-blue-700 leading-normal flex-1">
+                        {config.dismissableNoticeText}
+                    </p>
+                    <button
+                        onClick={() => setShowNotice(false)}
+                        className="text-blue-400 hover:text-blue-700 transition-colors"
+                    >
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            )}
+
             {/* Messages Area - Using our new Conversation component */}
             <ConversationContainer className="flex-1 relative">
                 <ConversationContent>
@@ -287,6 +308,23 @@ export function ChatView({
                                                 format="time"
                                             />
                                         </div>
+
+                                        {/* Actions for Assistant Messages */}
+                                        {(msg.role === "assistant" || isAgent) && msg.content && (
+                                            <div className="px-4 mb-2">
+                                                <MessageActions
+                                                    config={config}
+                                                    content={msg.content}
+                                                    isLast={msg.id === messages[messages.length - 1]?.id}
+                                                    onRegenerate={() => {
+                                                        onRegenerate?.(msg.id);
+                                                    }}
+                                                    onFeedback={(type) => {
+                                                        onFeedback?.(msg.id, type);
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}

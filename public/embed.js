@@ -140,6 +140,10 @@
 
             // Inform iframe
             iframe.contentWindow.postMessage({ type: 'widget:opened' }, '*');
+
+            // Remove popup if exists
+            var popup = document.getElementById('verly-chat-popup');
+            if (popup) popup.remove();
         } else {
             // Close
             container.style.opacity = '0';
@@ -151,6 +155,9 @@
             launcher.querySelector('.msg-icon').style.transform = 'rotate(0) scale(1)';
             launcher.querySelector('.close-icon').style.opacity = '0';
             launcher.querySelector('.close-icon').style.transform = 'rotate(-90deg) scale(0.5)';
+
+            // Inform iframe
+            iframe.contentWindow.postMessage({ type: 'widget:closed' }, '*');
         }
     }
 
@@ -170,6 +177,88 @@
 
         if (data.type === 'widget:close') {
             toggleWidget(false);
+        }
+
+        if (data.type === 'widget:open') {
+            toggleWidget(true);
+        }
+
+
+        if (data.type === 'widget:notify') {
+            var payload = data.payload || {};
+            var text = payload.text;
+            if (!text) return;
+
+            // Don't show if already open
+            if (isOpen) return;
+
+            // Create or update popup
+            var existingPopup = document.getElementById('verly-chat-popup');
+            if (!existingPopup) {
+                var popup = document.createElement('div');
+                popup.id = 'verly-chat-popup';
+
+                var popupPosition = config.position === 'bottom-left'
+                    ? 'left: 20px; bottom: 90px; transform-origin: bottom left;'
+                    : 'right: 20px; bottom: 90px; transform-origin: bottom right;';
+
+                popup.style.cssText = [
+                    'position: fixed',
+                    popupPosition,
+                    'background: white',
+                    'padding: 12px 16px',
+                    'border-radius: 12px',
+                    'box-shadow: 0 4px 20px rgba(0,0,0,0.15)',
+                    'font-family: system-ui, -apple-system, sans-serif',
+                    'font-size: 14px',
+                    'line-height: 1.4',
+                    'color: #1f2937',
+                    'max-width: 260px',
+                    'z-index: 2147483646', // Below launcher
+                    'cursor: pointer',
+                    'opacity: 0',
+                    'transform: scale(0.9) translateY(10px)',
+                    'transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                    'display: flex',
+                    'align-items: flex-start',
+                    'gap: 8px'
+                ].join(';');
+
+                // Close button for popup
+                var closeBtn = document.createElement('div');
+                closeBtn.innerHTML = '&times;';
+                closeBtn.style.cssText = 'color: #9ca3af; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; margin-right: -4px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;';
+                closeBtn.onclick = function (e) {
+                    e.stopPropagation();
+                    popup.remove();
+                };
+
+                // Message text container
+                var msgText = document.createElement('div');
+                msgText.className = 'popup-text';
+                msgText.style.cssText = 'flex: 1; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;';
+                msgText.textContent = text;
+
+                popup.appendChild(msgText);
+                popup.appendChild(closeBtn);
+
+                popup.onclick = function () {
+                    toggleWidget(true);
+                    popup.remove();
+                };
+
+                document.body.appendChild(popup);
+
+                // Animate in
+                requestAnimationFrame(function () {
+                    popup.style.opacity = '1';
+                    popup.style.transform = 'scale(1) translateY(0)';
+                });
+            } else {
+                // Update text if exists
+                var txt = existingPopup.querySelector('.popup-text');
+                if (txt) txt.textContent = text;
+            }
         }
 
         if (data.type === 'widget:resize') {

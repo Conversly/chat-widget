@@ -159,17 +159,19 @@ export function ChatInput({
 
                     {/* Right Actions */}
                     <div className="flex items-center gap-2">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleVoiceClick}
-                            className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                            disabled={disabled}
-                            title="Voice input"
-                        >
-                            <Mic className="h-4 w-4" />
-                        </Button>
+                        {config.enableVoice && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleVoiceClick}
+                                className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                                disabled={disabled}
+                                title="Voice input"
+                            >
+                                <Mic className="h-4 w-4" />
+                            </Button>
+                        )}
 
                         <Button
                             type="submit"

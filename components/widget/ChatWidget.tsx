@@ -3,18 +3,19 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { WidgetConfig, WidgetView } from "@/types/chatbot";
-import type { Conversation, Message, ChatMessage } from "@/types/activity";
+import type { Conversation, Message, ChatMessage as ApiChatMessage } from "@/types/activity";
 import type { ChatbotResponseData } from "@/types/response";
 import { HomeView } from "./HomeView";
 import { MessagesView } from "./MessagesView";
 import { ChatView } from "./ChatView";
 import { usePostMessage } from "@/hooks/usePostMessage";
-import { streamChatbotResponse } from "@/lib/api/response";
+import { streamChatbotResponse, submitFeedback } from "@/lib/api/response";
 import { getChatHistory, listVisitorConversations } from "@/lib/api/activity";
-import { useChat, type ChatStatus } from "@/hooks/use-chat-state";
+import { useChat, type ChatStatus, type ChatMessage as StateChatMessage } from "@/hooks/use-chat-state";
 import { getStoredVisitorId, getStoredConversationId, setStoredConversationId } from "@/lib/storage";
 import { WidgetWebSocketClient } from "@/store/widget-websocket-client";
 import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "@/types/websocket";
+import { SOUNDS } from "@/lib/config/sounds";
 
 interface ChatWidgetProps {
     config: WidgetConfig;
@@ -35,10 +36,13 @@ const defaultConfig: WidgetConfig = {
         { id: "1", name: "Support", status: "online" },
     ],
     newsFeedItems: [],
+    popupSoundEnabled: true,
 };
 
 export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProps) {
     const [currentView, setCurrentView] = useState<WidgetView>("home");
+    // Track if the widget is currently visible (open) in the parent page
+    const [isWidgetOpen, setIsWidgetOpen] = useState(false);
     const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [conversationId, setConversationId] = useState<string | null>(null);
@@ -180,6 +184,18 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                 }, 300);
             }
         },
+        {
+            type: "widget:opened",
+            handler: () => {
+                setIsWidgetOpen(true);
+            }
+        },
+        {
+            type: "widget:closed",
+            handler: () => {
+                setIsWidgetOpen(false);
+            }
+        }
     ], []);
 
     const { postToHost } = usePostMessage({ handlers: messageHandlers });
@@ -196,11 +212,77 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
 
     const handleCloseWidget = useCallback(() => {
         postToHost("widget:close");
+        setIsWidgetOpen(false);
         setTimeout(() => {
             setCurrentView("home");
             setActiveConversation(null);
         }, 300);
     }, [postToHost]);
+
+    // Auto-Show Logic
+    useEffect(() => {
+        if (!config.autoShowInitial) return;
+        // Simple check: if we haven't shown it yet in this session (could use sessionStorage)
+        // For now, just respect the config delay.
+        const timer = setTimeout(() => {
+            postToHost("widget:open");
+        }, (config.autoShowDelaySec || 0) * 1000);
+
+        return () => clearTimeout(timer);
+    }, [config.autoShowInitial, config.autoShowDelaySec, postToHost]);
+
+    // Sound Logic
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    useEffect(() => {
+        // Initialize audio
+        audioRef.current = new Audio(config.popupSoundUrl || SOUNDS.POPUP);
+    }, [config.popupSoundUrl]);
+
+    // Track if history is loaded to avoid playing sound on initial load
+    const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
+    const lastProcessedMessageId = useRef<string | null>(null);
+
+    useEffect(() => {
+        // Initialize audio
+        audioRef.current = new Audio(config.popupSoundUrl || SOUNDS.POPUP);
+    }, [config.popupSoundUrl]);
+
+    useEffect(() => {
+        // Check if last message is from agent and is new (simple check via length or ID)
+        const lastMsg = messages[messages.length - 1];
+        if (!lastMsg) return;
+
+        // Only act if it's an agent message and we are not the one who sent it
+        if (lastMsg.role === "assistant" || lastMsg.role === "agent") {
+            // Check if we've already processed this message to avoid duplicate sounds/popups
+            // (e.g. on re-renders, history load state change, or streaming updates)
+            if (lastProcessedMessageId.current === lastMsg.id) {
+                return;
+            }
+            lastProcessedMessageId.current = lastMsg.id;
+
+            // If widget is closed, notify parent to show popup and play sound
+            if (!isWidgetOpen) {
+                // Only play sound if history is already loaded (i.e., this is a new message)
+                // Default to true if not specified
+                if ((config.popupSoundEnabled !== false) && isHistoryLoaded) {
+                    audioRef.current?.play().catch(e => console.error("Audio play failed", e));
+                }
+
+                postToHost("widget:notify", {
+                    text: lastMsg.content || "New message"
+                });
+            }
+        }
+    }, [messages, config.popupSoundEnabled, isWidgetOpen, postToHost, isHistoryLoaded]);
+
+    // Mark history as loaded after first message update or if no messages
+    useEffect(() => {
+        if (messages.length > 0 || status === 'ready') {
+            const timer = setTimeout(() => setIsHistoryLoaded(true), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [messages.length, status]);
 
     // State for UI interactions
     const [isMaximized, setIsMaximized] = useState(false);
@@ -366,37 +448,8 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
         void refreshConversations();
     }, [currentView, refreshConversations]);
 
-    const handleSendMessage = useCallback(async (content: string) => {
-        // If a human has taken over, route messages via WS only.
-        if (isHumanActive) {
-            const convId = getStoredConversationId();
-            const roomId = wsRoomIdRef.current || (convId ? `conversation:${convId}` : null);
-            if (!convId || !roomId) return;
-
-            const localId = addMessage({
-                role: "user",
-                content,
-                status: "sent",
-            });
-
-            wsClientRef.current?.sendUserMessage({
-                roomId,
-                conversationId: convId,
-                text: content,
-                // let backend correlate if desired
-                messageId: localId,
-            });
-
-            return;
-        }
-
-        // Add user message
-        const userMessageId = addMessage({
-            role: "user",
-            content,
-            status: "sent",
-        });
-
+    // Common function to process chatbot response (used by sendMessage and regenerate)
+    const processResponse = useCallback(async (history: StateChatMessage[]) => {
         // Create placeholder for assistant response
         const assistantMessageId = addMessage({
             role: "assistant",
@@ -421,15 +474,8 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
 
         try {
             // Convert messages to backend format
-            const allMessages = messages.concat({
-                id: userMessageId,
-                role: "user",
-                content,
-                createdAt: new Date(),
-            });
-
-            const chatMessages: ChatMessage[] = allMessages.map((m) => ({
-                role: m.role as "user" | "assistant",
+            const chatMessages: ApiChatMessage[] = history.map((m) => ({
+                role: (m.role === "agent" ? "assistant" : m.role) as "user" | "assistant",
                 content: m.content,
             }));
 
@@ -496,6 +542,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                     updateMessage(assistantMessageId, {
                         content: response.response,
                         status: "delivered",
+                        responseId: response.responseId,
                     });
                     setStatus("ready");
                     void refreshConversations();
@@ -517,7 +564,89 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
             });
             setStatus("error");
         }
-    }, [messages, config, addMessage, updateMessage, setStatus, refreshConversations]);
+    }, [config, addMessage, updateMessage, setStatus, refreshConversations, shouldConnectWsForEscalationStatus, shouldRouteMessagesToHuman]);
+
+    const handleSendMessage = useCallback(async (content: string) => {
+        // If a human has taken over, route messages via WS only.
+        if (isHumanActive) {
+            const convId = getStoredConversationId();
+            const roomId = wsRoomIdRef.current || (convId ? `conversation:${convId}` : null);
+            if (!convId || !roomId) return;
+
+            const localId = addMessage({
+                role: "user",
+                content,
+                status: "sent",
+            });
+
+            wsClientRef.current?.sendUserMessage({
+                roomId,
+                conversationId: convId,
+                text: content,
+                // let backend correlate if desired
+                messageId: localId,
+            });
+
+            return;
+        }
+
+        // Add user message
+        const userMessageId = addMessage({
+            role: "user",
+            content,
+            status: "sent",
+        });
+
+        const newMessage: StateChatMessage = {
+            id: userMessageId,
+            role: "user",
+            content,
+            createdAt: new Date(),
+            status: "sent",
+        };
+
+        // Process response with new history
+        await processResponse([...messages, newMessage]);
+
+    }, [messages, isHumanActive, addMessage, wsRoomIdRef, processResponse]);
+
+    const handleRegenerate = useCallback(async (messageId: string) => {
+        // Find message index
+        const msgIndex = messages.findIndex(m => m.id === messageId);
+        if (msgIndex === -1) return;
+
+        // Find last user message
+        const lastUserIndex = messages.map((m, i) => ({ ...m, origIndex: i }))
+            .filter(m => m.role === "user")
+            .pop()?.origIndex;
+
+        if (lastUserIndex === undefined) return;
+
+        // Truncate history to include the user message, removing subsequent assistant messages
+        const newHistory = messages.slice(0, lastUserIndex + 1);
+
+        // Update state
+        setMessages(newHistory);
+
+        // Re-process response
+        await processResponse(newHistory);
+    }, [messages, setMessages, processResponse]);
+
+    const handleFeedback = useCallback(async (messageId: string, type: "positive" | "negative") => {
+        const msg = messages.find(m => m.id === messageId);
+        if (!msg?.responseId) {
+            console.warn("Cannot submit feedback: No responseId for message", messageId);
+            return;
+        }
+
+        try {
+            await submitFeedback(msg.responseId, type);
+            console.log("Feedback submitted:", type);
+            // Optional: show toast or update UI state to show feedback was given
+        } catch (e) {
+            console.error("Failed to submit feedback:", e);
+        }
+    }, [messages]);
 
     const handleSuggestedMessageClick = useCallback((message: string) => {
         const newConversation: Conversation = {
@@ -560,6 +689,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
         timestamp: m.createdAt, // Compatibility
         status: m.status,
         agentId: activeConversation?.agent.id,
+        responseId: m.responseId,
     }));
 
     return (
@@ -606,6 +736,8 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
                     onNewChat={handleStartNewConversation}
                     onMute={handleMute}
                     isMuted={isMuted}
+                    onRegenerate={handleRegenerate}
+                    onFeedback={handleFeedback}
                 />
             )}
         </div>

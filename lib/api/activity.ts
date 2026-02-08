@@ -141,8 +141,7 @@ export async function getChatHistory(
   let res: ChatbotHistoryData;
   try {
     const raw = await terminalFetch
-      // Terminal expects `conversationId` + `chatbotId` in query params and no JSON body.
-      .post(API.ENDPOINTS.TERMINAL.ACTIVITY.HISTORY(), undefined, {
+      .get(API.ENDPOINTS.TERMINAL.ACTIVITY.HISTORY(), {
         params: { conversationId: cid, chatbotId: botId },
       })
       .then((res: AxiosResponse<unknown>) => res.data);
