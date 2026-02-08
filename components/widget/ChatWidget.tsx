@@ -645,7 +645,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
     const handleSendMessage = useCallback(async (content: string) => {
         // If a human has taken over, route messages via WS only.
         if (isHumanActive) {
-            const convId = getStoredConversationId();
+            const convId = getStoredConversationId(config.chatbotId || "");
             const roomId = wsRoomIdRef.current || (convId ? `conversation:${convId}` : null);
             if (!convId || !roomId) return;
 
