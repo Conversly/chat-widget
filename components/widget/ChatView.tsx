@@ -247,7 +247,11 @@ export function ChatView({
             )}
 
             {/* Messages Area - Using our new Conversation component */}
-            <ConversationContainer className="flex-1 relative">
+            <ConversationContainer
+                className="flex-1 relative"
+                messages={messages}
+                scrollButton={<ConversationScrollButton />}
+            >
                 <ConversationContent>
                     {groupedMessages.map((group, groupIndex) => (
                         <div key={groupIndex}>
@@ -331,7 +335,6 @@ export function ChatView({
                         </div>
                     ))}
                 </ConversationContent>
-                <ConversationScrollButton />
             </ConversationContainer>
 
             {/* Input Area */}

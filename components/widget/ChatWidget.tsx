@@ -241,6 +241,7 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
     // Track if history is loaded to avoid playing sound on initial load
     const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
     const lastProcessedMessageId = useRef<string | null>(null);
+    const lastProcessedMessageContent = useRef<string | null>(null);
 
     useEffect(() => {
         // Initialize audio
@@ -254,24 +255,33 @@ export function ChatWidget({ config = defaultConfig, className }: ChatWidgetProp
 
         // Only act if it's an agent message and we are not the one who sent it
         if (lastMsg.role === "assistant" || lastMsg.role === "agent") {
-            // Check if we've already processed this message to avoid duplicate sounds/popups
-            // (e.g. on re-renders, history load state change, or streaming updates)
-            if (lastProcessedMessageId.current === lastMsg.id) {
-                return;
-            }
-            lastProcessedMessageId.current = lastMsg.id;
+            const isNewId = lastProcessedMessageId.current !== lastMsg.id;
+            const isContentChanged = lastProcessedMessageContent.current !== lastMsg.content;
 
             // If widget is closed, notify parent to show popup and play sound
+            // BUT only if something actually changed (ID or Content)
             if (!isWidgetOpen) {
-                // Only play sound if history is already loaded (i.e., this is a new message)
-                // Default to true if not specified
-                if ((config.popupSoundEnabled !== false) && isHistoryLoaded) {
-                    audioRef.current?.play().catch(e => console.error("Audio play failed", e));
-                }
+                if (isNewId || isContentChanged) {
+                    // SOUND: Only play sound if this is a NEW message ID
+                    // AND history is loaded (silences initial load)
+                    if (isNewId && (config.popupSoundEnabled !== false) && isHistoryLoaded) {
+                        audioRef.current?.play().catch(e => console.error("Audio play failed", e));
+                    }
 
-                postToHost("widget:notify", {
-                    text: lastMsg.content || "New message"
-                });
+                    // NOTIFICATION: Update popup if content changed or it's a new message
+                    postToHost("widget:notify", {
+                        text: lastMsg.content || "New message"
+                    });
+
+                    // Update tracking refs to mark as processed/notified
+                    lastProcessedMessageId.current = lastMsg.id;
+                    lastProcessedMessageContent.current = lastMsg.content;
+                }
+            } else {
+                // If widget is open, we consider the message "seen".
+                // Update refs so that if user minimizes later, we don't popup this old message.
+                lastProcessedMessageId.current = lastMsg.id;
+                lastProcessedMessageContent.current = lastMsg.content;
             }
         }
     }, [messages, config.popupSoundEnabled, isWidgetOpen, postToHost, isHistoryLoaded]);

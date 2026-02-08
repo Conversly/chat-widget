@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
  */
 interface ConversationProps extends React.HTMLAttributes<HTMLDivElement> {
     children: React.ReactNode;
+    messages?: any[];
+    scrollButton?: React.ReactNode;
 }
 
 const ConversationContext = React.createContext<{
@@ -24,9 +26,10 @@ export function useConversation() {
     return React.useContext(ConversationContext);
 }
 
-export function Conversation({ children, className, ...props }: ConversationProps) {
+export function Conversation({ children, className, messages = [], scrollButton, ...props }: ConversationProps) {
     const scrollRef = React.useRef<HTMLDivElement>(null);
     const [isAtBottom, setIsAtBottom] = React.useState(true);
+    const prevMessagesLengthRef = React.useRef(messages.length);
 
     const scrollToBottom = React.useCallback((behavior: ScrollBehavior = "smooth") => {
         if (scrollRef.current) {
@@ -40,22 +43,52 @@ export function Conversation({ children, className, ...props }: ConversationProp
     const handleScroll = React.useCallback(() => {
         if (!scrollRef.current) return;
         const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-        const threshold = 100;
-        setIsAtBottom(scrollHeight - scrollTop - clientHeight < threshold);
+        const threshold = 100; // Pixel threshold to consider "at bottom"
+        // Check if we are close to bottom
+        const atBottom = scrollHeight - scrollTop - clientHeight < threshold;
+        setIsAtBottom(atBottom);
+    }, []);
+
+    // Auto-scroll logic
+    React.useEffect(() => {
+        const lastMessage = messages[messages.length - 1];
+        const isNewMessage = messages.length > prevMessagesLengthRef.current;
+        const isUserMessage = lastMessage?.role === 'user';
+
+        // Scroll to bottom if:
+        // 1. We were already at the bottom
+        // 2. OR it's a message sent by the user (force scroll)
+        // 3. OR it's a completely new chat (length 0 -> 1)
+        if (isNewMessage) {
+            if (isAtBottom || isUserMessage) {
+                // Use 'auto' behavior for instant scroll on user send, smooth otherwise? 
+                // usually smooth is nice.
+                // Timeout allows DOM to update height before scrolling
+                setTimeout(() => scrollToBottom("smooth"), 0);
+            }
+        } else if (messages.length === 0) {
+            setIsAtBottom(true);
+        }
+
+        prevMessagesLengthRef.current = messages.length;
+    }, [messages, isAtBottom, scrollToBottom]);
+
+    // Initial scroll on mount
+    React.useEffect(() => {
+        scrollToBottom("auto");
     }, []);
 
     return (
         <ConversationContext.Provider value={{ scrollRef, scrollToBottom, isAtBottom }}>
-            <div
-                ref={scrollRef}
-                onScroll={handleScroll}
-                className={cn(
-                    "flex-1 overflow-y-auto overflow-x-hidden",
-                    className
-                )}
-                {...props}
-            >
-                {children}
+            <div className={cn("relative flex-1 overflow-hidden", className)} {...props}>
+                <div
+                    ref={scrollRef}
+                    onScroll={handleScroll}
+                    className="h-full w-full overflow-y-auto overflow-x-hidden"
+                >
+                    {children}
+                </div>
+                {scrollButton}
             </div>
         </ConversationContext.Provider>
     );
@@ -96,7 +129,7 @@ export function ConversationScrollButton({
         <button
             onClick={() => scrollToBottom()}
             className={cn(
-                "absolute bottom-4 left-1/2 -translate-x-1/2",
+                "absolute bottom-4 right-4",
                 "flex items-center justify-center",
                 "w-8 h-8 rounded-full",
                 "bg-white shadow-md border border-gray-200",
