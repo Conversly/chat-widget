@@ -41,6 +41,7 @@ const defaultConfig: WidgetConfig = {
     ],
     newsFeedItems: [],
     popupSoundEnabled: true,
+    collectUserFeedback: true,
 };
 
 export function ChatWidget({ config = defaultConfig, className, defaultOpen = false }: ChatWidgetProps) {

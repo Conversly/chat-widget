@@ -39,7 +39,10 @@ export function MessageActions({
     };
 
     return (
-        <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className={cn(
+            "flex items-center gap-1 mt-1 transition-opacity",
+            isLast ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        )}>
             <button
                 onClick={handleCopy}
                 className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
@@ -48,7 +51,7 @@ export function MessageActions({
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
 
-            {config.collectUserFeedback && (
+            {config.collectUserFeedback && isLast && (
                 <>
                     <button
                         onClick={() => handleFeedback("positive")}

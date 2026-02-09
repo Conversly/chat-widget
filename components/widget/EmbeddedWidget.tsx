@@ -79,6 +79,7 @@ export function EmbeddedWidget({ chatbotId, testing = false, playground = false 
                         newsFeedItems: [
                             { id: "1", title: "Welcome!", description: "This is a demo widget in testing mode." }
                         ],
+                        collectUserFeedback: true,
                     };
                     setApiConfig(defaultConfig);
                     setLoading(false);
@@ -126,7 +127,7 @@ export function EmbeddedWidget({ chatbotId, testing = false, playground = false 
                     enableNewsFeed: false,
                     enableVoice: response.partial.callEnabled ?? false,
                     showAgentAvatars: true,
-                    collectUserFeedback: styles.collectUserFeedback ?? false,
+                    collectUserFeedback: styles.collectUserFeedback ?? true,
                     regenerateMessages: styles.regenerateMessages ?? true,
                     continueSuggestedMessages: styles.continueShowingSuggestedMessages ?? false,
 

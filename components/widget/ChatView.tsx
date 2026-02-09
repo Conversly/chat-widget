@@ -25,6 +25,13 @@ import { ChatInput } from "./ChatInput";
 import { MessageActions } from "./MessageActions";
 
 import { LeadGenerationForm } from "./LeadGenerationForm";
+import {
+    PositiveFeedbackForm,
+    NegativeFeedbackForm,
+    type PositiveFeedbackData,
+    type NegativeFeedbackData
+} from "./FeedbackForm";
+import { submitFeedback } from "@/lib/api/response";
 
 export interface AssignedAgentInfo {
     displayName: string | null;
@@ -76,6 +83,18 @@ export function ChatView({
     const [input, setInput] = useState("");
     const [showNotice, setShowNotice] = useState(true);
     const [revealedMessageIds, setRevealedMessageIds] = useState<Set<string>>(new Set());
+    const [feedbackState, setFeedbackState] = useState<{ messageId: string; type: "positive" | "negative" } | null>(null);
+
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Scroll to bottom when feedback form appears
+    useEffect(() => {
+        if (feedbackState) {
+            setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+            }, 100);
+        }
+    }, [feedbackState]);
 
     // Toggle message time visibility
     const toggleMessageTime = (messageId: string) => {
@@ -93,6 +112,31 @@ export function ChatView({
         if (text.trim()) {
             onSendMessage(text.trim());
             setInput("");
+        }
+    };
+
+    const handleFeedbackSubmit = async (data: PositiveFeedbackData | NegativeFeedbackData) => {
+        if (!feedbackState) return;
+
+        try {
+            let comment = "";
+            if ("incorrect" in data) {
+                // Negative feedback
+                const parts = [];
+                if (data.issue) parts.push(`Issue: ${data.issue}`);
+                if (data.incorrect) parts.push("Incorrect information");
+                if (data.irrelevant) parts.push("Irrelevant response");
+                if (data.unaddressed) parts.push("Question not fully addressed");
+                comment = parts.join(", ");
+            } else {
+                // Positive feedback
+                comment = data.issue;
+            }
+
+            await submitFeedback(feedbackState.messageId, feedbackState.type, comment);
+            setFeedbackState(null);
+        } catch (error) {
+            console.error("Failed to submit feedback", error);
         }
     };
 
@@ -289,7 +333,7 @@ export function ChatView({
                                 const agentAvatar = assignedAgent?.avatarUrl;
 
                                 return (
-                                    <div className="mb-3">
+                                    <div className="mb-3 group">
                                         {/* Agent identity label (only for agent messages) */}
                                         {isAgent && (
                                             <div className="flex items-center gap-2 px-4 mb-1">
@@ -349,6 +393,7 @@ export function ChatView({
                                                         onRegenerate?.(msg.id);
                                                     }}
                                                     onFeedback={(type) => {
+                                                        setFeedbackState({ messageId: msg.id, type });
                                                         onFeedback?.(msg.id, type);
                                                     }}
                                                 />
@@ -395,6 +440,50 @@ export function ChatView({
                             </div>
                         </div>
                     )}
+
+                    {/* Feedback Form */}
+                    {feedbackState && (
+                        <div className="mb-3">
+                            <div className="flex items-center gap-2 px-4 mb-1">
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-medium overflow-hidden shrink-0">
+                                    {(assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon) ? (
+                                        <img
+                                            src={assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon}
+                                            alt={assignedAgent?.displayName || "Agent"}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        (assignedAgent?.displayName || "A").charAt(0)
+                                    )}
+                                </div>
+                                <span className="text-xs font-medium text-gray-600">
+                                    {assignedAgent?.displayName || "Assistant"}
+                                </span>
+                            </div>
+
+                            <MessageBubble from="assistant">
+                                <MessageContent>
+                                    {feedbackState.type === "positive" ? (
+                                        <PositiveFeedbackForm
+                                            config={config}
+                                            onSubmit={handleFeedbackSubmit}
+                                            onCancel={() => setFeedbackState(null)}
+                                        />
+                                    ) : (
+                                        <NegativeFeedbackForm
+                                            config={config}
+                                            onSubmit={handleFeedbackSubmit}
+                                            onCancel={() => setFeedbackState(null)}
+                                        />
+                                    )}
+                                </MessageContent>
+                            </MessageBubble>
+                            <div className="mt-1 px-4 text-left">
+                                <span className="text-[10px] text-gray-400">Just now</span>
+                            </div>
+                        </div>
+                    )}
+                    <div ref={messagesEndRef} />
                 </ConversationContent>
             </ConversationContainer>
 
@@ -410,12 +499,14 @@ export function ChatView({
             />
 
             {/* Footer text if configured */}
-            {config.footerText && (
-                <div className="px-4 pb-2 text-center">
-                    <span className="text-xs text-gray-400">{config.footerText}</span>
-                </div>
-            )}
+            {
+                config.footerText && (
+                    <div className="px-4 pb-2 text-center">
+                        <span className="text-xs text-gray-400">{config.footerText}</span>
+                    </div>
+                )
+            }
 
-        </div>
+        </div >
     );
 }

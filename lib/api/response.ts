@@ -553,7 +553,7 @@ export const submitFeedback = async (
   };
 
   const res = await responseFetch(
-    API.ENDPOINTS.RESPONSE.BASE_URL() + API.ENDPOINTS.RESPONSE.FEEDBACK(),
+    API.ENDPOINTS.RESPONSE.FEEDBACK(),
     {
       method: "POST",
       data: requestBody,
