@@ -38,6 +38,8 @@ export interface AssignedAgentInfo {
     avatarUrl: string | null;
 }
 
+import type { LeadForm } from "@/types/lead-forms";
+
 interface ChatViewProps {
     config: WidgetConfig;
     conversation: Conversation;
@@ -56,7 +58,8 @@ interface ChatViewProps {
     onRegenerate?: (messageId: string) => void;
     onFeedback?: (messageId: string, type: "positive" | "negative") => void;
     showLeadForm?: boolean;
-    onLeadSubmit?: (data: { name: string; email: string; phone?: string }) => Promise<void>;
+    leadForm?: LeadForm | null;
+    onLeadSubmit?: (data: Record<string, any>) => Promise<void>;
     onLeadDismiss?: () => void;
 }
 
@@ -77,6 +80,7 @@ export function ChatView({
     onRegenerate,
     onFeedback,
     showLeadForm,
+    leadForm,
     onLeadSubmit,
     onLeadDismiss,
 }: ChatViewProps) {
@@ -430,6 +434,7 @@ export function ChatView({
                                 <MessageContent>
                                     <LeadGenerationForm
                                         config={config}
+                                        leadForm={leadForm || null}
                                         onSubmit={onLeadSubmit}
                                         onDismiss={onLeadDismiss}
                                     />

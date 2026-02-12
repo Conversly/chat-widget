@@ -17,6 +17,8 @@ import { WidgetWebSocketClient } from "@/store/widget-websocket-client";
 import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "@/types/websocket";
 import { SOUNDS } from "@/lib/config/sounds";
 import { createLead } from "@/lib/api/leads";
+import { getLeadFormConfig, submitLeadForm } from "@/lib/api/lead-forms";
+import type { LeadForm } from "@/types/lead-forms";
 import { MAXIMIZE_WIDTH_SCALE_FACTOR, MAXIMIZE_HEIGHT_SCALE_FACTOR } from "@/lib/constants";
 import { useWidgetSound } from "@/hooks/use-widget-sound";
 
@@ -60,6 +62,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
     const wsClientRef = useRef<WidgetWebSocketClient | null>(null);
     const wsRoomIdRef = useRef<string | null>(null);
     const [showLeadForm, setShowLeadForm] = useState(false);
+    const [leadFormConfig, setLeadFormConfig] = useState<LeadForm | null>(null);
 
     // Use our new unified chat hook
     const {
@@ -236,6 +239,12 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
         return () => clearTimeout(timer);
     }, [config.autoShowInitial, config.autoShowDelaySec, postToHost]);
+
+    // Fetch Lead Form Config
+    useEffect(() => {
+        if (!config.chatbotId) return;
+        getLeadFormConfig(config.chatbotId).then(setLeadFormConfig);
+    }, [config.chatbotId]);
 
     // // Sound Logic
     // // Sound Logic
@@ -797,7 +806,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         setActiveConversation(null);
     };
 
-    const handleLeadSubmit = useCallback(async (data: { name: string; email: string; phone?: string }) => {
+    const handleLeadSubmit = useCallback(async (data: Record<string, any>) => {
         try {
             const visitorId = getStoredVisitorId(config.chatbotId || "");
             const convId = conversationId || getStoredConversationId(config.chatbotId || "");
@@ -807,28 +816,42 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                 return;
             }
 
-            await createLead({
+            await submitLeadForm({
                 chatbotId: config.chatbotId,
+                formId: leadFormConfig?.id || "",
                 conversationId: convId,
-                name: data.name,
-                email: data.email,
-                phoneNumber: data.phone || "",
+                visitorId: visitorId || "unknown", // Should we generate one if missing?
                 source: "WIDGET",
-                visitorId: visitorId || "",
-                // topicId can be inferred by backend or added if needed
+                responses: data
             });
 
             setStoredLeadGenerated(config.chatbotId);
-            setStoredLead(config.chatbotId, { name: data.name, email: data.email, phone: data.phone });
+
+            // Try to set stored lead details if we can map them from system fields
+            // Assuming the LeadForm config has systemField mappings, 
+            // but we only have raw data here keyed by fieldId.
+            // We can iterate leadFormConfig.fields to find system fields.
+            if (leadFormConfig) {
+                const leadDetails: { name?: string; email?: string; phone?: string } = {};
+                leadFormConfig.fields.forEach(field => {
+                    if (field.systemField === 'name') leadDetails.name = data[field.id];
+                    if (field.systemField === 'email') leadDetails.email = data[field.id];
+                    if (field.systemField === 'phone') leadDetails.phone = data[field.id];
+                });
+                // Fallback: Check for common keys if system fields aren't set (compatibility with old forms?)
+                // Actually, passing data.name/email directly won't work if keys are IDs.
+
+                setStoredLead(config.chatbotId, leadDetails as any);
+            }
+
             setShowLeadForm(false);
 
             // Optional: Add a system message or toast
-            // addMessage({ role: "system", content: "Thanks! We'll be in touch soon." });
         } catch (error) {
             console.error("Failed to submit lead:", error);
             throw error; // Re-throw to let form handle error state
         }
-    }, [config.chatbotId, conversationId]);
+    }, [config.chatbotId, conversationId, leadFormConfig]);
 
     // Convert our ChatMessage to the widget Message type
     const widgetMessages: Message[] = messages.map((m) => ({
@@ -890,6 +913,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                     onRegenerate={config.regenerateMessages ? handleRegenerate : undefined}
                     onFeedback={config.collectUserFeedback ? handleFeedback : undefined}
                     showLeadForm={showLeadForm}
+                    leadForm={leadFormConfig}
                     onLeadSubmit={handleLeadSubmit}
                     onLeadDismiss={() => setShowLeadForm(false)}
                 />
