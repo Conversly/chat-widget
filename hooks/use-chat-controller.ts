@@ -176,7 +176,7 @@ export function useChatController({
             id: m.message_id,
             role: m.role,
             content: m.content,
-            citations: m.citations,
+            citations: m.citations || [],
             createdAt: Number.isNaN(createdAt.getTime()) ? new Date() : createdAt,
             responseId: m.role === "assistant" ? m.message_id : undefined,
           }
@@ -449,7 +449,7 @@ export function useChatController({
                   ...m,
                   // Keep stable UI id but attach the canonical responseId for feedback.
                   content: response.response,
-                  citations: response.citations,
+                  citations: response.citations || m.citations || [],
                   responseId: resolvedResponseId,
                 }
                 : m,
@@ -461,7 +461,7 @@ export function useChatController({
             role: "assistant",
             content: response.response,
             createdAt: new Date(),
-            citations: response.citations,
+            citations: response.citations || [],
             responseId: resolvedResponseId,
           })
         }
@@ -577,7 +577,7 @@ export function useChatController({
               ? {
                 ...m,
                 content: response.response,
-                citations: response.citations,
+                citations: response.citations || m.citations || [],
                 responseId: resolvedResponseId,
               }
               : m,
@@ -589,7 +589,7 @@ export function useChatController({
           role: "assistant",
           content: response.response,
           createdAt: new Date(),
-          citations: response.citations,
+          citations: response.citations || [],
           responseId: resolvedResponseId,
         })
       }

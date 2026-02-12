@@ -11,9 +11,10 @@ interface MessageProps extends React.HTMLAttributes<HTMLDivElement> {
     from: "user" | "assistant" | "system";
     children: React.ReactNode;
     onBubbleClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
+    fullWidth?: boolean;
 }
 
-export function Message({ from, children, className, onBubbleClick, ...props }: MessageProps) {
+export function Message({ from, children, className, onBubbleClick, fullWidth, ...props }: MessageProps) {
     return (
         <div
             className={cn(
@@ -26,7 +27,8 @@ export function Message({ from, children, className, onBubbleClick, ...props }: 
             <div
                 onClick={onBubbleClick}
                 className={cn(
-                    "max-w-full rounded-2xl px-4 py-3",
+                    "rounded-2xl px-4 py-3",
+                    fullWidth ? "w-full" : "max-w-full",
                     onBubbleClick && "cursor-pointer",
                     from === "user"
                         ? "bg-black text-white rounded-br-md"
@@ -189,5 +191,113 @@ export function MessageStatus({ status, className, ...props }: MessageStatusProp
         <span className={cn("inline-flex", className)} {...props}>
             {icons[status]}
         </span>
+    );
+}
+
+/**
+ * MessageCitations - Citations list with image carousel
+ */
+import { ImageCarousel } from "@/components/widget/ImageCarousel";
+
+interface MessageCitationsProps {
+    citations?: string[];
+}
+
+export function MessageCitations({ citations }: MessageCitationsProps) {
+    console.log("MessageCitations render:", citations);
+    const [showAll, setShowAll] = React.useState(false);
+    if (!citations || citations.length === 0) return null;
+
+    // Filter citations into images and links
+    const isImage = (url: string) => {
+        try {
+            const extension = new URL(url).pathname.split('.').pop()?.toLowerCase();
+            return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '');
+        } catch {
+            return false;
+        }
+    };
+
+    const images = citations.filter(isImage);
+    const links = citations.filter(c => !isImage(c));
+
+    const maxVisible = 3;
+    const hasMore = links.length > maxVisible;
+    const visibleLinks = showAll ? links : links.slice(0, maxVisible);
+
+    const parseCitation = (citation: string): { href?: string; label: string } => {
+        const raw = (citation || "").trim();
+        if (!raw) return { label: "" };
+
+        // Absolute URLs
+        try {
+            const u = new URL(raw);
+            return { href: u.href, label: u.hostname.replace(/^www\./, "") || raw };
+        } catch {
+            // continue
+        }
+
+        // Relative URLs (best-effort)
+        if (typeof window !== "undefined") {
+            try {
+                const u = new URL(raw, window.location.origin);
+                return { href: u.href, label: u.hostname.replace(/^www\./, "") || raw };
+            } catch {
+                // continue
+            }
+        }
+
+        return { label: raw };
+    }
+
+    if (images.length === 0 && links.length === 0) return null;
+
+    return (
+        <div className="mt-2 space-y-2">
+            {/* Image Carousel */}
+            {images.length > 0 && (
+                <ImageCarousel images={images} />
+            )}
+
+            {/* Link Citations (CitationsBlock style) */}
+            {links.length > 0 && (
+                <div className="w-full">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-gray-500 mr-0.5">
+                            Sources:
+                        </span>
+                        {visibleLinks.map((citation, index) => {
+                            const parsed = parseCitation(citation);
+                            if (!parsed.label) return null;
+
+                            const Chip = parsed.href ? "a" : "span";
+                            return (
+                                <Chip
+                                    key={`${citation}-${index}`}
+                                    {...(parsed.href
+                                        ? { href: parsed.href, target: "_blank", rel: "noopener noreferrer" }
+                                        : {})}
+                                    className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-600 border border-gray-100"
+                                    title={citation}
+                                >
+                                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-gray-200 text-[9px] font-medium text-gray-600">
+                                        {index + 1}
+                                    </span>
+                                    <span className="max-w-[120px] truncate">{parsed.label}</span>
+                                </Chip>
+                            );
+                        })}
+                        {hasMore && !showAll && (
+                            <button
+                                onClick={() => setShowAll(true)}
+                                className="inline-flex items-center gap-0.5 rounded-full bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-500 transition-colors hover:bg-gray-100 border border-gray-100"
+                            >
+                                +{links.length - maxVisible} more
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

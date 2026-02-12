@@ -555,6 +555,10 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                     onDelta: (_delta, accumulated) => {
                         updateMessage(assistantMessageId, { content: accumulated });
                     },
+                    onCitations: (citations) => {
+                        console.log("ChatWidget (playground): received citations", citations);
+                        updateMessage(assistantMessageId, { citations });
+                    },
                     onFinal: (response) => {
                         if (response.conversation_id) {
                             const convId = response.conversation_id;
@@ -576,6 +580,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                         updateMessage(assistantMessageId, {
                             content: response.response,
                             status: "delivered",
+                            citations: response.citations,
                         });
                         setStatus("ready");
                     },
@@ -626,7 +631,12 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                     onDelta: (_delta, accumulated) => {
                         updateMessage(assistantMessageId, { content: accumulated });
                     },
+                    onCitations: (citations) => {
+                        console.log("ChatWidget: received citations", citations);
+                        updateMessage(assistantMessageId, { citations });
+                    },
                     onFinal: (response) => {
+                        console.log("ChatWidget: received final", response);
                         if (response.conversation_id) {
                             const convId = response.conversation_id;
                             setStoredConversationId(config.chatbotId || "", convId);
@@ -663,6 +673,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                             content: response.response,
                             status: "delivered",
                             responseId: response.responseId,
+                            citations: response.citations,
                         });
                         setStatus("ready");
                         void refreshConversations();
@@ -863,6 +874,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         status: m.status,
         agentId: activeConversation?.agent.id,
         responseId: m.responseId,
+        citations: m.citations,
     }));
 
     return (

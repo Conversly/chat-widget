@@ -165,6 +165,7 @@ export async function streamChatbotResponse(
             }
             case "citations": {
               const e = event as Extract<ResponseStreamEvent, { type: "citations" }>;
+              console.log("NDJSON citation event:", e);
               callbacks.onCitations?.(Array.isArray(e.citations) ? e.citations : []);
               break;
             }

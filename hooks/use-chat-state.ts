@@ -10,6 +10,7 @@ export interface ChatMessage {
     createdAt: Date;
     status?: "sending" | "sent" | "streaming" | "delivered" | "error";
     responseId?: string;
+    citations?: string[];
 }
 
 export type ChatStatus = "ready" | "submitted" | "streaming" | "error";

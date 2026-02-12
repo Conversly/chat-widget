@@ -13,6 +13,7 @@ export {
     MessageAvatar,
     MessageTimestamp,
     MessageStatus,
+    MessageCitations,
 } from "./message";
 
 

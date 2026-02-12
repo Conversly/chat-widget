@@ -39,7 +39,7 @@ export function PositiveFeedbackForm({
     const isDark = config.appearance === "dark";
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-3 w-full max-w-[280px]">
+        <form onSubmit={handleSubmit} className="space-y-3 w-full">
             <div>
                 <label
                     htmlFor="positive-feedback"
@@ -170,7 +170,7 @@ export function NegativeFeedbackForm({
     );
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-3 w-full max-w-[280px]">
+        <form onSubmit={handleSubmit} className="space-y-3 w-full">
             <div>
                 <label
                     htmlFor="negative-feedback"

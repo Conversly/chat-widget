@@ -10,9 +10,12 @@ import {
     ConversationContent,
     ConversationScrollButton,
     Message as MessageBubble,
+    MessageAvatar,
     MessageContent,
     MessageResponse,
     MessageTimestamp,
+    MessageStatus,
+    MessageCitations,
 } from "@/components/ai";
 import {
     DropdownMenu,
@@ -337,7 +340,7 @@ export function ChatView({
                                 const agentAvatar = assignedAgent?.avatarUrl;
 
                                 return (
-                                    <div className="mb-3 group">
+                                    <div key={msg.id} className="mb-3 group">
                                         {/* Agent identity label (only for agent messages) */}
                                         {isAgent && (
                                             <div className="flex items-center gap-2 px-4 mb-1">
@@ -370,25 +373,33 @@ export function ChatView({
                                                 ) : (
                                                     <span>{msg.content}</span>
                                                 )}
+                                                {/* Citations */}
+                                                {(() => {
+                                                    const hasCitations = (msg.role === "assistant" || isAgent) && msg.citations && msg.citations.length > 0;
+                                                    if (msg.role === "assistant") {
+                                                        console.log(`Msg ${msg.id} citations:`, msg.citations);
+                                                    }
+                                                    return hasCitations && (
+                                                        <MessageCitations citations={msg.citations} />
+                                                    );
+                                                })()}
                                             </MessageContent>
                                         </MessageBubble>
-                                        {(msg.id === messages[messages.length - 1]?.id || revealedMessageIds.has(msg.id)) && (
-                                            <div
-                                                className={cn(
-                                                    "mt-1 px-4",
-                                                    msg.role === "user" ? "text-right" : "text-left"
-                                                )}
-                                            >
+
+                                        {/* Footer: Timestamp + Actions on the same line */}
+                                        <div className={cn(
+                                            "px-4 mt-1 flex items-center gap-3 min-h-[24px]",
+                                            msg.role === "user" ? "justify-end" : "justify-start"
+                                        )}>
+                                            {(msg.id === messages[messages.length - 1]?.id || revealedMessageIds.has(msg.id)) && (
                                                 <MessageTimestamp
                                                     date={msg.timestamp || new Date()}
                                                     format="time"
                                                 />
-                                            </div>
-                                        )}
+                                            )}
 
-                                        {/* Actions for Assistant Messages */}
-                                        {(msg.role === "assistant" || isAgent) && msg.content && (
-                                            <div className="px-4 mb-2">
+                                            {/* Actions for Assistant Messages */}
+                                            {(msg.role === "assistant" || isAgent) && msg.content && (
                                                 <MessageActions
                                                     config={config}
                                                     content={msg.content}
@@ -401,8 +412,8 @@ export function ChatView({
                                                         onFeedback?.(msg.id, type);
                                                     }}
                                                 />
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -430,7 +441,7 @@ export function ChatView({
                                 </span>
                             </div>
 
-                            <MessageBubble from="assistant">
+                            <MessageBubble from="assistant" fullWidth={true}>
                                 <MessageContent>
                                     <LeadGenerationForm
                                         config={config}
@@ -466,7 +477,7 @@ export function ChatView({
                                 </span>
                             </div>
 
-                            <MessageBubble from="assistant">
+                            <MessageBubble from="assistant" fullWidth={true}>
                                 <MessageContent>
                                     {feedbackState.type === "positive" ? (
                                         <PositiveFeedbackForm
