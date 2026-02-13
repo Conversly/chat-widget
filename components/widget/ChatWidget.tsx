@@ -402,6 +402,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                 content: m.content,
                 createdAt: new Date(m.created_at),
                 status: "delivered" as const,
+                citations: m.citations,
             }));
 
             if (mapped.length > 0) {
