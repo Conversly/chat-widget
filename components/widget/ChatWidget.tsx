@@ -21,6 +21,7 @@ import { getLeadFormConfig, submitLeadForm } from "@/lib/api/lead-forms";
 import type { LeadForm } from "@/types/lead-forms";
 import { MAXIMIZE_WIDTH_SCALE_FACTOR, MAXIMIZE_HEIGHT_SCALE_FACTOR } from "@/lib/constants";
 import { useWidgetSound } from "@/hooks/use-widget-sound";
+import { NUDGE_CONFIG } from "@/lib/nudge-config";
 
 interface ChatWidgetProps {
     config: WidgetConfig;
@@ -239,6 +240,57 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
         return () => clearTimeout(timer);
     }, [config.autoShowInitial, config.autoShowDelaySec, postToHost]);
+
+    // Nudge Logic (Page Triggers)
+    useEffect(() => {
+        // We need to listen to URL changes reported by the embed script
+        const handleMessage = (event: MessageEvent) => {
+            const data = event.data;
+            if (data?.type === 'widget:url_change' && data.payload?.url) {
+                const currentUrl = data.payload.url;
+                console.log("[ChatWidget] URL Change detected:", currentUrl);
+                // Check all nudges
+                NUDGE_CONFIG.forEach(nudge => {
+                    let isMatch = false;
+                    if (nudge.matchType === 'exact') isMatch = currentUrl === nudge.pattern;
+                    else if (nudge.matchType === 'contains') isMatch = currentUrl.includes(nudge.pattern);
+                    else if (nudge.matchType === 'regex') isMatch = new RegExp(nudge.pattern).test(currentUrl);
+
+                    console.log(`[ChatWidget] Checking nudge ${nudge.id}: match=${isMatch}, pattern=${nudge.pattern}`);
+
+                    if (isMatch) {
+                        // Check if already shown in this session
+                        const storageKey = `conversly_nudge_shown_${nudge.id}`;
+                        const alreadyShown = sessionStorage.getItem(storageKey);
+                        console.log(`[ChatWidget] Nudge ${nudge.id} matched! Already shown? ${alreadyShown}, Widget open? ${isWidgetOpen}`);
+
+                        if (alreadyShown) return;
+
+                        // Check if widget is already open (don't nudge if open)
+                        if (isWidgetOpen) return;
+
+                        // Schedule nudge
+                        console.log(`[ChatWidget] Scheduling nudge ${nudge.id} in ${nudge.delay || 1000}ms`);
+                        setTimeout(() => {
+                            // double check widget state
+                            if (isWidgetOpen) return;
+
+                            console.log(`[ChatWidget] Triggering nudge ${nudge.id} NOW`);
+                            postToHost("widget:notify", {
+                                messages: nudge.messages
+                            });
+
+                            // Mark as shown
+                            sessionStorage.setItem(storageKey, 'true');
+                        }, nudge.delay || 1000);
+                    }
+                });
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [isWidgetOpen, postToHost]);
 
     // Fetch Lead Form Config
     useEffect(() => {

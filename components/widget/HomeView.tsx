@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
+
 import { X, Home, MessageSquare, Send, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WidgetConfig, NewsFeedItem } from "@/types/chatbot";
@@ -27,6 +29,27 @@ export function HomeView({
 }: HomeViewProps) {
     const unreadCount = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
     const recentConversation = conversations.length > 0 ? conversations[0] : null;
+
+    const [isScrolling, setIsScrolling] = useState(false);
+    const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const handleScroll = () => {
+        setIsScrolling(true);
+        if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+        }
+        scrollTimeoutRef.current = setTimeout(() => {
+            setIsScrolling(false);
+        }, 1500); // Keep scrollbar visible for 1.5s after scrolling stops
+    };
+
+    useEffect(() => {
+        return () => {
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+        };
+    }, []);
 
     // Helper to format time relative to now (e.g. "2h ago")
     const formatTime = (date: Date) => {
@@ -82,7 +105,13 @@ export function HomeView({
             </div>
 
             {/* Content Area - Negative Margin to overlap header */}
-            <div className="flex-1 overflow-y-auto px-4 -mt-16 relative z-20 pb-4 space-y-4 no-scrollbar">
+            <div
+                onScroll={handleScroll}
+                className={cn(
+                    "flex-1 overflow-y-auto px-4 -mt-16 relative z-20 pb-4 space-y-4 thin-scrollbar",
+                    isScrolling && "scrolling"
+                )}
+            >
 
                 {/* Recent Message Card */}
                 {recentConversation && (

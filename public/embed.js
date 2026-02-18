@@ -186,25 +186,41 @@
 
         if (data.type === 'widget:notify') {
             var payload = data.payload || {};
-            var text = payload.text;
-            if (!text) return;
+            var messages = payload.messages || (payload.text ? [payload.text] : []);
+
+            if (!messages.length) return;
 
             // Don't show if already open
             if (isOpen) return;
 
-            // Create or update popup
-            var existingPopup = document.getElementById('verly-chat-popup');
-            if (!existingPopup) {
-                var popup = document.createElement('div');
-                popup.id = 'verly-chat-popup';
+            // Remove existing popups to refresh
+            var existingContainer = document.getElementById('verly-chat-popups');
+            if (existingContainer) existingContainer.remove();
 
-                var popupPosition = config.position === 'bottom-left'
-                    ? 'left: 20px; bottom: 90px; transform-origin: bottom left;'
-                    : 'right: 20px; bottom: 90px; transform-origin: bottom right;';
+            var popupContainer = document.createElement('div');
+            popupContainer.id = 'verly-chat-popups';
+
+            var containerPosition = config.position === 'bottom-left'
+                ? 'left: 20px; bottom: 90px; align-items: flex-start;'
+                : 'right: 20px; bottom: 90px; align-items: flex-end;';
+
+            popupContainer.style.cssText = [
+                'position: fixed',
+                containerPosition,
+                'display: flex',
+                'flex-direction: column',
+                'gap: 10px',
+                'z-index: 2147483646', // Below launcher
+                'pointer-events: none', // Allow clicking through container
+            ].join(';');
+
+            document.body.appendChild(popupContainer);
+
+            // Create bubbles for each message
+            messages.forEach(function (text, index) {
+                var popup = document.createElement('div');
 
                 popup.style.cssText = [
-                    'position: fixed',
-                    popupPosition,
                     'background: white',
                     'padding: 12px 16px',
                     'border-radius: 12px',
@@ -214,14 +230,14 @@
                     'line-height: 1.4',
                     'color: #1f2937',
                     'max-width: 260px',
-                    'z-index: 2147483646', // Below launcher
                     'cursor: pointer',
                     'opacity: 0',
                     'transform: scale(0.9) translateY(10px)',
                     'transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                     'display: flex',
                     'align-items: flex-start',
-                    'gap: 8px'
+                    'gap: 8px',
+                    'pointer-events: auto'
                 ].join(';');
 
                 // Close button for popup
@@ -230,13 +246,15 @@
                 closeBtn.style.cssText = 'color: #9ca3af; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; margin-right: -4px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;';
                 closeBtn.onclick = function (e) {
                     e.stopPropagation();
-                    popup.remove();
+                    popup.style.opacity = '0';
+                    popup.style.transform = 'scale(0.9) translateY(10px)';
+                    setTimeout(function () { popup.remove(); }, 300);
                 };
 
                 // Message text container
                 var msgText = document.createElement('div');
                 msgText.className = 'popup-text';
-                msgText.style.cssText = 'flex: 1; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;';
+                msgText.style.cssText = 'flex: 1; overflow: hidden;';
                 msgText.textContent = text;
 
                 popup.appendChild(msgText);
@@ -244,21 +262,19 @@
 
                 popup.onclick = function () {
                     toggleWidget(true);
-                    popup.remove();
+                    popupContainer.remove();
                 };
 
-                document.body.appendChild(popup);
+                popupContainer.appendChild(popup);
 
-                // Animate in
-                requestAnimationFrame(function () {
-                    popup.style.opacity = '1';
-                    popup.style.transform = 'scale(1) translateY(0)';
-                });
-            } else {
-                // Update text if exists
-                var txt = existingPopup.querySelector('.popup-text');
-                if (txt) txt.textContent = text;
-            }
+                // Stagger animations
+                setTimeout(function () {
+                    requestAnimationFrame(function () {
+                        popup.style.opacity = '1';
+                        popup.style.transform = 'scale(1) translateY(0)';
+                    });
+                }, index * 200);
+            });
         }
 
         if (data.type === 'widget:resize') {
@@ -268,7 +284,55 @@
             if (payload.maxWidth) container.style.maxWidth = payload.maxWidth;
             if (payload.maxHeight) container.style.maxHeight = payload.maxHeight;
         }
+
+        if (data.type === 'widget:ready') {
+            iframe.contentWindow.postMessage({
+                type: 'widget:url_change',
+                payload: { url: window.location.href }
+            }, '*');
+        }
     });
+
+    // --- 6. URL Change Detection ---
+    var lastUrl = window.location.href;
+
+    function checkUrlChange() {
+        var currentUrl = window.location.href;
+        if (currentUrl !== lastUrl) {
+            lastUrl = currentUrl;
+            // Notify widget
+            iframe.contentWindow.postMessage({
+                type: 'widget:url_change',
+                payload: { url: currentUrl }
+            }, '*');
+        }
+    }
+
+    // Monkey patch history API
+    var pushState = history.pushState;
+    history.pushState = function () {
+        pushState.apply(history, arguments);
+        checkUrlChange();
+    };
+
+    var replaceState = history.replaceState;
+    history.replaceState = function () {
+        replaceState.apply(history, arguments);
+        checkUrlChange();
+    };
+
+    window.addEventListener('popstate', checkUrlChange);
+
+    // Fallback polling for frameworks that might bypass history API
+    setInterval(checkUrlChange, 1000);
+
+    // Initial check (in case iframe loads after some navigation)
+    iframe.onload = function () {
+        iframe.contentWindow.postMessage({
+            type: 'widget:url_change',
+            payload: { url: window.location.href }
+        }, '*');
+    };
 
     // console.log('[ChatWidget] Hybrid setup complete.');
 

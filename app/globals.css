@@ -38,3 +38,39 @@ body {
   background-color: var(--chat-scrollbar-color, #000000);
   border-radius: 5px;
 }
+
+/* Utility to hide scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Utility to make scrollbar thin and transparent */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 20px;
+  transition: background-color 0.3s ease;
+}
+
+.thin-scrollbar:hover::-webkit-scrollbar-thumb,
+.thin-scrollbar.scrolling::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  /* Gray-400 with opacity */
+}
+
+.thin-scrollbar:hover::-webkit-scrollbar-thumb:hover,
+.thin-scrollbar.scrolling::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.8);
+}
