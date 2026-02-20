@@ -542,7 +542,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         });
 
         // If no API credentials, use dummy response
-        if (!config.chatbotId || !config.uniqueClientId) {
+        if (!config.chatbotId) {
             console.warn("[ChatWidget] No API credentials, using dummy response");
             setTimeout(() => {
                 updateMessage(assistantMessageId, {
