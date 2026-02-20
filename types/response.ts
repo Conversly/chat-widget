@@ -1,25 +1,8 @@
 import { ChatHistoryMessage } from "@/types/activity";
 
-export interface ResponseUserMetadata {
-  [key: string]: any;
-}
-
-export interface ResponseUser {
-  uniqueClientId: string;
-  converslyWebId: string;
-  metadata?: ResponseUserMetadata;
-}
-
-export interface ResponseRequestMetadata {
-  originUrl?: string;
-  [key: string]: any;
-}
-
 export interface ChatbotResponseRequest {
   query?: string; // JSON stringified messages
   mode?: string;
-  user: ResponseUser;
-  metadata?: ResponseRequestMetadata;
   conversationId?: string;
   chatbotId: string;
 }
@@ -45,8 +28,6 @@ export interface ChatbotResponseData {
     initialMessage?: string;
     callEnabled?: boolean;
     suggestedMessages?: string[];
-    converslyWebId?: string;
-    uniqueClientId?: string;
   };
   lead_generation?: boolean;
 }

@@ -149,8 +149,6 @@ export function EmbeddedWidget({ chatbotId, testing = false, playground = false 
 
                     // API Credentials
                     chatbotId: String(chatbotId),
-                    converslyWebId: response.partial.converslyWebId ?? "",
-                    uniqueClientId: response.partial.uniqueClientId ?? "",
                     testing: testing,
                 };
 

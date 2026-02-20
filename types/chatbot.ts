@@ -40,8 +40,6 @@ export interface WidgetAttentionConfig {
 
 export interface ChatbotCustomizationPartial {
     styles: WidgetStyles;
-    converslyWebId: string;   // chatbot api key
-    uniqueClientId: string;   // unique identifier for this conversation instance
     callEnabled?: boolean;
     attention?: WidgetAttentionConfig;
     initialMessage: string;
@@ -150,8 +148,6 @@ export interface WidgetConfig {
 
     // API Credentials (for messaging)
     chatbotId?: string;
-    converslyWebId?: string;
-    uniqueClientId?: string;
     testing?: boolean;
     isPlayground?: boolean;
     playgroundOverrides?: {

@@ -491,7 +491,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             console.error("[ChatWidget] Failed to load history:", e);
             setStatus("ready");
         }
-    }, [clearMessages, config.converslyWebId, config.greeting, config.testing, config.uniqueClientId, setMessages, setStatus]);
+    }, [clearMessages, config.greeting, config.testing, setMessages, setStatus]);
 
     const refreshConversations = useCallback(async () => {
         if (typeof window === "undefined") return;
@@ -542,7 +542,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         });
 
         // If no API credentials, use dummy response
-        if (!config.converslyWebId || !config.uniqueClientId) {
+        if (!config.chatbotId || !config.uniqueClientId) {
             console.warn("[ChatWidget] No API credentials, using dummy response");
             setTimeout(() => {
                 updateMessage(assistantMessageId, {
@@ -583,14 +583,8 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                         chatbotTemperature: config.playgroundOverrides.temperature || 0.7,
                     },
                     chatbotId: config.playgroundOverrides.chatbotId || config.chatbotId || "",
-                    user: {
-                        uniqueClientId: config.uniqueClientId,
-                        converslyWebId: config.converslyWebId,
-                        metadata: {},
-                    },
-                    metadata: {
-                        originUrl: typeof window !== "undefined" ? window.location.href : undefined,
-                    },
+                    metadata: {},
+                    user: {},
                     conversationId: getStoredConversationId(config.chatbotId || "") || undefined,
                 };
 
@@ -651,14 +645,8 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                 const requestBody = {
                     query: JSON.stringify(chatMessages),
                     mode: "default",
-                    user: {
-                        uniqueClientId: config.uniqueClientId,
-                        converslyWebId: config.converslyWebId,
-                        metadata: {},
-                    },
-                    metadata: {
-                        originUrl: typeof window !== "undefined" ? window.location.href : undefined,
-                    },
+                    metadata: {},
+                    user: {},
                     conversationId: getStoredConversationId(config.chatbotId || "") || undefined,
                     chatbotId: config.chatbotId || "",
                 };

@@ -106,12 +106,10 @@ export function useChatController({
 
   const storageKey = useMemo(() => {
     if (storageKeyOverride) return storageKeyOverride
-    // Keep stable per end-user (uniqueClientId) + workspace (converslyWebId)
-    // Note: chatbotId isn't available here (only in some adapters), so we key without it.
-    const webId = config.converslyWebId || "unknown_web"
-    const clientId = config.uniqueClientId || "unknown_client"
-    return `conversly:convId:${webId}:${clientId}`
-  }, [config.converslyWebId, config.uniqueClientId, storageKeyOverride])
+    // Keep stable per bot (chatbotId)
+    const botId = config.chatbotId || "unknown_bot"
+    return `conversly:convId:${botId}`
+  }, [config.chatbotId, storageKeyOverride])
 
   // Hydrate conversationId once (localStorage -> store)
   useEffect(() => {
@@ -223,9 +221,8 @@ export function useChatController({
   }, [
     conversationId,
     config.InitialMessage,
-    config.converslyWebId,
+    config.chatbotId,
     config.testing,
-    config.uniqueClientId,
     store,
   ])
 
