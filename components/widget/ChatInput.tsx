@@ -61,7 +61,7 @@ export function ChatInput({
     return (
         <div
             className={cn(
-                "border-t p-4 bg-white",
+                "border-t pt-3 px-4 pb-2 bg-white",
                 config.appearance === "dark" ? "border-gray-800 bg-gray-900" : "border-gray-100"
             )}
         >
@@ -69,7 +69,7 @@ export function ChatInput({
             {config.suggestedMessages &&
                 config.suggestedMessages.filter((q: string) => q).length > 0 &&
                 (config.continueSuggestedMessages || !hasUserMessages) && (
-                    <div className="flex flex-wrap justify-end gap-2 mb-4">
+                    <div className="flex flex-wrap justify-end gap-2 mb-2">
                         {config.suggestedMessages
                             .filter((q: string) => q)
                             .map((question: string, idx: number) => (
@@ -89,19 +89,7 @@ export function ChatInput({
                     </div>
                 )}
 
-            {/* Powered By Text (Above Input) */}
-            {config.showPoweredBy && (
-                <div className="flex justify-center mb-2">
-                    <div
-                        className={cn(
-                            "text-[11px] font-medium opacity-60 flex items-center gap-1",
-                            config.appearance === "dark" ? "text-gray-400" : "text-gray-500"
-                        )}
-                    >
-                        Powered by <span className="font-semibold">{config.brandName || "Verly"}</span>
-                    </div>
-                </div>
-            )}
+
 
             {/* Input Section - Cal.com Style */}
             <form
@@ -122,7 +110,7 @@ export function ChatInput({
                     rows={1}
                     disabled={disabled}
                     className={cn(
-                        "w-full px-3 py-3 border-0 bg-transparent resize-none outline-none text-[15px] leading-relaxed",
+                        "w-full px-3 py-2 border-0 bg-transparent resize-none outline-none text-[15px] leading-relaxed",
                         config.appearance === "dark"
                             ? "text-white placeholder:text-gray-500"
                             : "text-gray-900 placeholder:text-gray-400"

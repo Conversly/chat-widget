@@ -523,6 +523,27 @@ export function ChatView({
                 )
             }
 
+            {/* Clickable Branding */}
+            {(config.showPoweredBy !== false) && (
+                <div className="pb-2 pt-0 flex justify-center">
+                    <a
+                        href="https://verlyai.xyz"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 opacity-40 hover:opacity-100 transition-opacity duration-200"
+                    >
+                        <img
+                            src="/verly_logo_bw.png"
+                            alt="Verlyai Logo"
+                            className="w-6 h-6 object-contain grayscale"
+                        />
+                        <span className="text-[11px] font-medium text-gray-500 tracking-tight">
+                            Powered by <span className="font-bold text-gray-900">Verlyai</span>
+                        </span>
+                    </a>
+                </div>
+            )}
+
         </div >
     );
 }
