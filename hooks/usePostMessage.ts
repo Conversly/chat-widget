@@ -27,24 +27,29 @@ export function usePostMessage(options?: { handlers?: MessageHandler[] }) {
     // Check if we're inside an iframe
     const isInIframe = typeof window !== "undefined" && window.parent !== window;
 
+    // Derive host origin from referrer (the page that embedded us)
+    const hostOrigin = typeof window !== "undefined" && document.referrer
+        ? new URL(document.referrer).origin
+        : "*";
+
     // Send message to parent/host
     const postToHost = useCallback((type: string, payload?: any) => {
         if (typeof window === "undefined") return;
 
         const message = {
-            source: "chat-widget",
+            source: "verly-widget",
             type,
             payload,
         };
 
-        // If in iframe, post to parent
+        // If in iframe, post to parent with explicit origin
         if (window.parent !== window) {
-            window.parent.postMessage(message, "*");
+            window.parent.postMessage(message, hostOrigin);
         }
 
         // Also dispatch custom event for same-origin usage
-        window.dispatchEvent(new CustomEvent("chat-widget-message", { detail: message }));
-    }, []);
+        window.dispatchEvent(new CustomEvent("verly-widget-message", { detail: message }));
+    }, [hostOrigin]);
 
     // Listen for messages from host
     useEffect(() => {
@@ -53,13 +58,10 @@ export function usePostMessage(options?: { handlers?: MessageHandler[] }) {
         const handleMessage = (event: MessageEvent) => {
             const data = event.data;
 
-            // Only handle messages from our host script
-            // TODO: For strict production security, add: if (event.origin !== EXPECTED_ORIGIN) return;
-            if (!data || typeof data !== "object" || data.source !== "chat-widget-host") {
+            // Only handle messages from our host script with correct source
+            if (!data || typeof data !== "object" || data.source !== "verly-widget-host") {
                 return;
             }
-
-            console.log("[ChatWidget] Received message from host:", data.type);
 
             // Find and execute matching handler
             const handler = handlers.find((h) => h.type === data.type);
