@@ -92,6 +92,7 @@ export function useChatController({
   const isOpen = useChatStore((s) => s.isOpen)
   const conversationId = useChatStore((s) => s.conversationId)
   const escalation = useChatStore((s) => s.escalation)
+  const conversationState = useChatStore((s) => s.conversationState)
   const conversationPhase = useChatStore((s) => s.conversationPhase)
   const widgetState = useChatStore((s) => s.widgetState)
   const assignedAgentDisplayName = useChatStore((s) => s.assignedAgentDisplayName)
@@ -305,13 +306,21 @@ export function useChatController({
     })
   }, [store])
 
-  // Connect WS when escalated + conversationId is known. Disconnect when reset/closed.
+  // Connect WS when conversation is escalated. Use conversationState as the source of truth —
+  // the escalation object may be temporarily null (e.g. race between streaming response and
+  // GetHistory), but conversationState from the server is the definitive signal.
   useEffect(() => {
     const client = wsClientRef.current
     if (!client) return
 
+    // Escalated states that require a live socket connection
+    const ESCALATED_STATES = new Set(["ESCALATED_UNASSIGNED", "ASSIGNED"])
+    const isEscalated =
+      ESCALATED_STATES.has(conversationState ?? "") ||
+      !!escalation
+
     const shouldConnect =
-      !!conversationId && !!escalation && widgetState !== "CLOSED"
+      !!conversationId && isEscalated && widgetState !== "CLOSED"
 
     if (!shouldConnect) {
       client.disconnect()
@@ -325,7 +334,8 @@ export function useChatController({
     client.join(roomId)
     client.connect()
 
-    // If escalation happened but state wasn't updated (defensive), ensure AI_ESCALATED.
+    // Ensure the widget state machine reflects escalation (defensive — applyResponseMeta
+    // normally handles this, but conversationState may arrive before escalation object).
     if (store.getState().widgetState === "AI_ONLY") {
       store.getState().setWidgetState("AI_ESCALATED")
     }
@@ -334,7 +344,7 @@ export function useChatController({
       // keep connection if hook stays mounted; cleanup is handled on reset/close above
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, escalation, widgetState, store])
+  }, [conversationId, conversationState, escalation, widgetState, store])
 
   const handleSendMessage = useCallback(
     async (content: string) => {

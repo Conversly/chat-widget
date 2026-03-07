@@ -252,31 +252,48 @@ export function createChatStore({
           next.conversationId = res.conversation_id
         }
 
-        // Update conversation state from response if available
-        if (res.conversationState) {
-          next.conversationState = res.conversationState
+        // conversationState from the server is the authoritative source of truth.
+        const serverConvState = res.conversationState ?? null
+        if (serverConvState) {
+          next.conversationState = serverConvState
         }
 
         // Conversation closed overrides everything else
-        if (res.conversation_status === "CLOSED" || res.conversationState === "CLOSED") {
+        if (res.conversation_status === "CLOSED" || serverConvState === "CLOSED") {
           next.widgetState = "CLOSED"
           next.conversationPhase = "CLOSED"
           return next as Partial<ChatStore>
         }
 
+        // Derive widget state from conversationState (primary) with escalation object as fallback.
+        // This prevents spurious AI_ONLY downgrades when escalation object is temporarily null
+        // (e.g. race between the streaming final event and a GetHistory re-fetch).
+        const ESCALATED_SERVER_STATES = new Set<ConversationState>(["ESCALATED_UNASSIGNED", "ASSIGNED"])
+        const serverSaysEscalated = ESCALATED_SERVER_STATES.has(serverConvState as ConversationState)
+        const isEscalated = serverSaysEscalated || !!res.escalation
+
         if (res.escalation) {
           next.escalation = res.escalation
+        }
 
-          // Enter escalated state, but never downgrade HUMAN_ACTIVE.
+        if (isEscalated) {
+          // Never downgrade once human has taken over.
           if (state.widgetState === "AI_ONLY") {
             next.widgetState = "AI_ESCALATED"
             next.conversationPhase = widgetStateToConversationPhase("AI_ESCALATED")
           }
+          // ASSIGNED: an agent has claimed the conversation — advance to socket-connected.
+          if (serverConvState === "ASSIGNED" && state.widgetState === "AI_ESCALATED") {
+            next.widgetState = "HUMAN_SOCKET_CONNECTED"
+            next.conversationPhase = widgetStateToConversationPhase("HUMAN_SOCKET_CONNECTED")
+          }
         } else {
-          // If backend says no escalation and we haven't been taken over, default to AI_ONLY.
+          // Server says AI_ACTIVE and no escalation object — safe to return to bot state,
+          // but never downgrade from an already-established human session.
           if (
             state.widgetState !== "HUMAN_ACTIVE" &&
-            state.widgetState !== "HUMAN_SOCKET_CONNECTED"
+            state.widgetState !== "HUMAN_SOCKET_CONNECTED" &&
+            state.widgetState !== "AI_ESCALATED"
           ) {
             next.widgetState = "AI_ONLY"
             next.conversationPhase = widgetStateToConversationPhase("AI_ONLY")
