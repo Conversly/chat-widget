@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronLeft, X, MoreHorizontal, Maximize2, Minimize2, RefreshCw, VolumeX, Volume2, Download } from "lucide-react";
+import { ChevronLeft, X, MoreHorizontal, Maximize2, Minimize2, RefreshCw, VolumeX, Volume2, Download, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WidgetConfig } from "@/types/chatbot";
 import type { Conversation, Message } from "@/types/activity";
@@ -45,6 +45,7 @@ export interface AssignedAgentInfo {
 
 import type { LeadForm } from "@/types/lead-forms";
 import type { StoredLead } from "@/lib/storage";
+import type { ConversationState } from "@/types/activity";
 
 interface ChatViewProps {
     config: WidgetConfig;
@@ -71,6 +72,8 @@ interface ChatViewProps {
     onNoAgentsFormSubmit?: (data: { name: string; email: string }) => Promise<void>;
     onNoAgentsFormDismiss?: () => void;
     storedLead?: StoredLead | null;
+    /** Conversation state to determine if input should be disabled */
+    conversationState?: ConversationState | null;
 }
 
 export function ChatView({
@@ -97,6 +100,7 @@ export function ChatView({
     onNoAgentsFormSubmit,
     onNoAgentsFormDismiss,
     storedLead,
+    conversationState,
 }: ChatViewProps) {
     const [input, setInput] = useState("");
     const [showNotice, setShowNotice] = useState(true);
@@ -226,26 +230,26 @@ export function ChatView({
                     >
                         <ChevronLeft className="w-5 h-5 text-gray-600" />
                     </button>
-                    <div className="flex items-center gap-2">
-                        {/* Agent avatar */}
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br bg-white flex items-center justify-center text-white text-sm font-medium overflow-hidden">
-                            {config.brandLogo ? (
-                                <img
-                                    src={config.brandLogo}
-                                    alt={conversation.agent.name}
-                                    className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                conversation.agent.name.charAt(0)
-                            )}
-                        </div>
-                        <div>
-                            <div className="font-semibold text-gray-900 text-sm">
-                                {conversation.agent.name}
+                        <div className="flex items-center gap-2">
+                            {/* Agent avatar */}
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br bg-white flex items-center justify-center text-white text-sm font-medium overflow-hidden">
+                                {config.brandLogo ? (
+                                    <img
+                                        src={config.brandLogo}
+                                        alt={conversation.agent.name}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    conversation.agent.name.charAt(0)
+                                )}
                             </div>
+                            <div>
+                                <div className="font-semibold text-gray-900 text-sm flex items-center gap-1.5">
+                                    {conversation.agent.name}
+                                </div>
 
+                            </div>
                         </div>
-                    </div>
                 </div>
                 <div className="flex items-center gap-1">
                     <DropdownMenu modal={false}>
@@ -326,6 +330,7 @@ export function ChatView({
                     </button>
                 </div>
             )}
+
 
             {/* Messages Area - Using our new Conversation component */}
             <ConversationContainer
@@ -547,16 +552,26 @@ export function ChatView({
                 </ConversationContent>
             </ConversationContainer>
 
-            {/* Input Area */}
-            <ChatInput
-                config={config}
-                input={input}
-                setInput={setInput}
-                handleSendMessage={handleSubmit}
-                handleSuggestionClick={handleSubmit}
-                hasUserMessages={hasUserMessages}
-                disabled={status === "streaming"}
-            />
+            {/* Input Area - Hidden when conversation is ended */}
+            {conversationState !== "RESOLVED" && conversationState !== "CLOSED" ? (
+                <ChatInput
+                    config={config}
+                    input={input}
+                    setInput={setInput}
+                    handleSendMessage={handleSubmit}
+                    handleSuggestionClick={handleSubmit}
+                    hasUserMessages={hasUserMessages}
+                    disabled={status === "streaming"}
+                />
+            ) : (
+                <div className="px-4 py-6 text-center border-t border-gray-100 flex flex-col items-center gap-2">
+                    <CheckCircle2 className={cn(
+                        "w-5 h-5",
+                        conversationState === "RESOLVED" ? "text-green-600" : "text-gray-400"
+                    )} />
+                    <span className="text-sm text-gray-500">Your conversation has ended</span>
+                </div>
+            )}
 
             {/* Footer text if configured */}
             {

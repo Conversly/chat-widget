@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { WidgetConfig, WidgetView } from "@/types/chatbot";
-import type { Conversation, Message, ChatMessage as ApiChatMessage } from "@/types/activity";
+import type { Conversation, Message, ChatMessage as ApiChatMessage, ConversationState } from "@/types/activity";
 import type { ChatbotResponseData } from "@/types/response";
 import { HomeView } from "./HomeView";
 import { MessagesView } from "./MessagesView";
@@ -73,6 +73,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
     const [onlineAgents, setOnlineAgents] = useState<number | null>(null);
     const [showNoAgentsForm, setShowNoAgentsForm] = useState(false);
     const [noAgentsFormSubmitted, setNoAgentsFormSubmitted] = useState(false);
+    const [conversationState, setConversationState] = useState<ConversationState | null>(null);
 
     // Stored lead data (from lead gen form)
     const [storedLead, setStoredLeadState] = useState<StoredLead | null>(null);
@@ -147,6 +148,11 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                                     ? data.assignedAgentAvatarUrl
                                     : null,
                         });
+
+                        // Capture conversation state
+                        if (typeof data?.conversationState === "string") {
+                            setConversationState(data.conversationState as ConversationState);
+                        }
 
                         // Capture online agents count
                         const agentsCount = typeof data?.onlineAgents === "number" ? data.onlineAgents : null;
@@ -530,7 +536,10 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
             // If history indicates escalation is requested/active, connect WS immediately.
             const histEsc = (history as any)?.escalation;
-            const histConvState = (history as any)?.conversationState;
+            const histConvState = (history as any)?.conversationState as ConversationState | undefined;
+            if (histConvState) {
+                setConversationState(histConvState);
+            }
             if (histEsc && shouldConnectWsForEscalationStatus(histConvState)) {
                 setEscalation(histEsc);
                 if (shouldRouteMessagesToHuman(histConvState)) {
@@ -1063,6 +1072,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                     onNoAgentsFormSubmit={handleNoAgentsFormSubmit}
                     onNoAgentsFormDismiss={handleNoAgentsFormDismiss}
                     storedLead={storedLead}
+                    conversationState={conversationState}
                 />
             )}
         </div>
