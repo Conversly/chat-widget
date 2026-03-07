@@ -39,6 +39,7 @@ const defaultConfig: WidgetConfig = {
     appearance: "light",
     position: "bottom-right",
     enableNewsFeed: true,
+    enableVoice: true,
     showAgentAvatars: true,
     agents: [
         { id: "1", name: "Support", status: "online" },
