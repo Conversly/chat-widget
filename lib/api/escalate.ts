@@ -22,7 +22,7 @@ export async function submitOfflineContact(
   request: SubmitOfflineContactRequest,
 ): Promise<SubmitOfflineContactResponse> {
   const res = await axios.post<ApiResponse<SubmitOfflineContactResponse>>(
-    `${API.ENDPOINTS.TERMINAL.ESCALATE.HANDLE_ABSENCE()}`,
+    `${API.BASE_URL}${API.ENDPOINTS.TERMINAL.ESCALATE.HANDLE_ABSENCE()}`,
     request,
     {
       headers: {
