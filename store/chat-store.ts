@@ -258,8 +258,12 @@ export function createChatStore({
           next.conversationState = serverConvState
         }
 
-        // Conversation closed overrides everything else
-        if (res.conversation_status === "CLOSED" || serverConvState === "CLOSED") {
+        // Conversation closed/resolved overrides everything else — no further messaging allowed
+        if (
+          res.conversation_status === "CLOSED" ||
+          serverConvState === "CLOSED" ||
+          serverConvState === "RESOLVED"
+        ) {
           next.widgetState = "CLOSED"
           next.conversationPhase = "CLOSED"
           return next as Partial<ChatStore>
@@ -268,7 +272,13 @@ export function createChatStore({
         // Derive widget state from conversationState (primary) with escalation object as fallback.
         // This prevents spurious AI_ONLY downgrades when escalation object is temporarily null
         // (e.g. race between the streaming final event and a GetHistory re-fetch).
-        const ESCALATED_SERVER_STATES = new Set<ConversationState>(["ESCALATED_UNASSIGNED", "ASSIGNED"])
+        // All states where the websocket is live / an agent is involved.
+        const ESCALATED_SERVER_STATES = new Set<ConversationState>([
+          "ESCALATED_UNASSIGNED",
+          "ASSIGNED",
+          "HUMAN_WAITING_USER",
+          "USER_WAITING_HUMAN",
+        ])
         const serverSaysEscalated = ESCALATED_SERVER_STATES.has(serverConvState as ConversationState)
         const isEscalated = serverSaysEscalated || !!res.escalation
 
@@ -286,6 +296,14 @@ export function createChatStore({
           if (serverConvState === "ASSIGNED" && state.widgetState === "AI_ESCALATED") {
             next.widgetState = "HUMAN_SOCKET_CONNECTED"
             next.conversationPhase = widgetStateToConversationPhase("HUMAN_SOCKET_CONNECTED")
+          }
+          // Active back-and-forth states — promote to HUMAN_ACTIVE.
+          if (
+            serverConvState === "HUMAN_WAITING_USER" ||
+            serverConvState === "USER_WAITING_HUMAN"
+          ) {
+            next.widgetState = "HUMAN_ACTIVE"
+            next.conversationPhase = widgetStateToConversationPhase("HUMAN_ACTIVE")
           }
         } else {
           // Server says AI_ACTIVE and no escalation object — safe to return to bot state,
