@@ -13,6 +13,16 @@ const defaultMessages = [
     "Searching for the best answer...",
     "Almost there...",
     "Getting things ready for you...",
+    "Consulting the knowledge base...",
+    "Finding the most accurate information...",
+    "Crafting a thoughtful response...",
+    "Double-checking the details...",
+    "Connecting the dots for you...",
+    "Synthesizing insights...",
+    "Reviewing multiple sources...",
+    "Polishing the perfect answer...",
+    "This will be worth the wait...",
+    "Preparing something helpful...",
 ];
 
 export function LoadingMessages({ className }: LoadingMessagesProps) {
@@ -20,43 +30,20 @@ export function LoadingMessages({ className }: LoadingMessagesProps) {
     const [isVisible, setIsVisible] = useState(true);
 
     useEffect(() => {
-        // Show each message for 3 seconds before transitioning
+        // Show each message for 6 seconds before transitioning
         const messageInterval = setInterval(() => {
             setIsVisible(false);
             setTimeout(() => {
                 setCurrentIndex((prev) => (prev + 1) % defaultMessages.length);
                 setIsVisible(true);
             }, 300); // Brief fade out before changing message
-        }, 3000);
+        }, 6000);
 
         return () => clearInterval(messageInterval);
     }, []);
 
     return (
-        <div className={cn("flex items-center gap-2 h-5 px-1", className)}>
-            <div className="flex gap-1 items-center mr-2">
-                <span
-                    className="w-1.5 h-1.5 rounded-full animate-bounce"
-                    style={{
-                        backgroundColor: "#9ca3af",
-                        animationDelay: "0ms",
-                    }}
-                />
-                <span
-                    className="w-1.5 h-1.5 rounded-full animate-bounce"
-                    style={{
-                        backgroundColor: "#9ca3af",
-                        animationDelay: "150ms",
-                    }}
-                />
-                <span
-                    className="w-1.5 h-1.5 rounded-full animate-bounce"
-                    style={{
-                        backgroundColor: "#9ca3af",
-                        animationDelay: "300ms",
-                    }}
-                />
-            </div>
+        <div className={cn("flex items-center h-5 px-1", className)}>
             <span
                 className={cn(
                     "text-sm text-gray-500 transition-opacity duration-300",
