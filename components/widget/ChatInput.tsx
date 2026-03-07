@@ -1,7 +1,7 @@
 "use client"
 
-import { useRef } from "react"
-import { Send, Paperclip, Smile, Mic } from "lucide-react"
+import { useRef, useState, useCallback, useEffect } from "react"
+import { Send, Paperclip, Smile, Mic, Square } from "lucide-react"
 import type { WidgetConfig } from "@/types/chatbot";
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -17,6 +17,56 @@ interface ChatInputProps {
     disabled?: boolean
 }
 
+// Web Speech API types
+interface SpeechRecognitionEvent extends Event {
+    results: SpeechRecognitionResultList;
+    resultIndex: number;
+}
+
+interface SpeechRecognitionResultList {
+    length: number;
+    item(index: number): SpeechRecognitionResult;
+    [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+    isFinal: boolean;
+    length: number;
+    item(index: number): SpeechRecognitionAlternative;
+    [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+    transcript: string;
+    confidence: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+    error: string;
+    message: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    maxAlternatives: number;
+    start(): void;
+    stop(): void;
+    abort(): void;
+    onresult: ((event: SpeechRecognitionEvent) => void) | null;
+    onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+    onend: (() => void) | null;
+    onstart: (() => void) | null;
+}
+
+declare global {
+    interface Window {
+        SpeechRecognition: new () => SpeechRecognition;
+        webkitSpeechRecognition: new () => SpeechRecognition;
+    }
+}
+
 export function ChatInput({
     config,
     input,
@@ -27,6 +77,9 @@ export function ChatInput({
     disabled = false,
 }: ChatInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const [isRecording, setIsRecording] = useState(false)
+    const [transcript, setTranscript] = useState("")
+    const recognitionRef = useRef<SpeechRecognition | null>(null)
 
     // Auto-resize textarea, max ~3x original height (36px base -> 108px max)
     useAutosizeTextArea({
@@ -54,8 +107,94 @@ export function ChatInput({
         // Trigger hidden file input if implemented
     }
 
+    // Initialize speech recognition
+    const initSpeechRecognition = useCallback(() => {
+        if (typeof window === "undefined") return null
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+        if (!SpeechRecognition) {
+            console.error("Speech recognition not supported in this browser")
+            return null
+        }
+
+        const recognition = new SpeechRecognition()
+        recognition.lang = "en-US"
+        recognition.continuous = true
+        recognition.interimResults = true
+        recognition.maxAlternatives = 1
+
+        recognition.onstart = () => {
+            setIsRecording(true)
+            setTranscript("")
+        }
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+            let finalTranscript = ""
+            let interimTranscript = ""
+
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i]
+                if (result.isFinal) {
+                    finalTranscript += result[0].transcript
+                } else {
+                    interimTranscript += result[0].transcript
+                }
+            }
+
+            if (finalTranscript) {
+                setTranscript((prevState: string) => prevState + finalTranscript)
+                setInput(input + finalTranscript)
+            } else if (interimTranscript) {
+                // Show interim results temporarily
+                const withoutInterim = input.replace(/\s+$/, "")
+                setInput(withoutInterim + interimTranscript)
+            }
+        }
+
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+            console.error("Speech recognition error:", event.error)
+            setIsRecording(false)
+        }
+
+        recognition.onend = () => {
+            setIsRecording(false)
+            setTranscript("")
+        }
+
+        return recognition
+    }, [setInput])
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (recognitionRef.current) {
+                recognitionRef.current.stop()
+            }
+        }
+    }, [])
+
     const handleVoiceClick = () => {
-        console.log("Voice click - Feature coming soon")
+        if (isRecording) {
+            // Stop recording
+            if (recognitionRef.current) {
+                recognitionRef.current.stop()
+                recognitionRef.current = null
+            }
+            setIsRecording(false)
+        } else {
+            // Start recording
+            const recognition = initSpeechRecognition()
+            if (recognition) {
+                recognitionRef.current = recognition
+                try {
+                    recognition.start()
+                } catch (error) {
+                    console.error("Failed to start speech recognition:", error)
+                }
+            } else {
+                alert("Speech recognition is not supported in your browser. Please try using Chrome, Safari, or Edge.")
+            }
+        }
     }
 
     return (
@@ -153,11 +292,20 @@ export function ChatInput({
                                 variant="ghost"
                                 size="icon"
                                 onClick={handleVoiceClick}
-                                className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                                 disabled={disabled}
-                                title="Voice input"
+                                title={isRecording ? "Stop recording" : "Voice input"}
+                                className={cn(
+                                    "h-8 w-8 rounded-lg transition-all duration-200",
+                                    isRecording
+                                        ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
+                                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                )}
                             >
-                                <Mic className="h-4 w-4" />
+                                {isRecording ? (
+                                    <Square className="h-4 w-4 fill-current" />
+                                ) : (
+                                    <Mic className="h-4 w-4" />
+                                )}
                             </Button>
                         )}
 
