@@ -14,6 +14,11 @@ export interface SubmitOfflineContactResponse {
   success: boolean;
 }
 
+
+export const terminalFetch = axios.create({
+  baseURL: API.BASE_URL,
+  withCredentials: true,
+});
 /**
  * Submit contact info when no agents are online during an escalation.
  * POST ${API.ENDPOINTS.TERMINAL.ESCALATE.HANDLE_ABSENCE()}
@@ -21,8 +26,8 @@ export interface SubmitOfflineContactResponse {
 export async function submitOfflineContact(
   request: SubmitOfflineContactRequest,
 ): Promise<SubmitOfflineContactResponse> {
-  const res = await axios.post<ApiResponse<SubmitOfflineContactResponse>>(
-    `${API.BASE_URL}${API.ENDPOINTS.TERMINAL.ESCALATE.HANDLE_ABSENCE()}`,
+  const res = await terminalFetch.post<ApiResponse<SubmitOfflineContactResponse>>(
+    API.ENDPOINTS.TERMINAL.ESCALATE.HANDLE_ABSENCE(),
     request,
     {
       headers: {
