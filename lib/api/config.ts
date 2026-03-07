@@ -32,7 +32,12 @@ export const API = {
     TERMINAL: {
       ACTIVITY: {
         HISTORY: () => "/activity/history",
-        CONVERSATIONS_BY_VISITOR: () => "/activity/conversations/by-visitor",
+        CONVERSATIONS_BY_CONTACT: () => "/activity/conversations/by-contact",
+        // Deprecated: Use CONVERSATIONS_BY_CONTACT instead
+        CONVERSATIONS_BY_VISITOR: () => "/activity/conversations/by-contact",
+      },
+      CONTACTS: {
+        WIDGET_INIT: () => "/contacts/widget/init",
       },
       DEPLOY: {
         WIDGET_EXTERNAL: () => "/deploy/widget/external",
@@ -43,6 +48,10 @@ export const API = {
       },
       LEADS: {
         BASE_URL: () => "/leads",
+      },
+      ESCALATE: {
+        BASE_URL: () => "/escalate",
+        HANDLE_ABSENCE: () => "/handle-absence",
       },
     },
 
@@ -66,7 +75,7 @@ export const API = {
     VOICE: {
       GENERATE_TOKEN: (chatbotId: string) =>
         `/voice/${encodeURIComponent(chatbotId)}/token`, // POST
-    },
+    }
   },
 };
 

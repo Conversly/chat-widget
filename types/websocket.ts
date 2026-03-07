@@ -60,6 +60,7 @@ export type WidgetWsStateUpdatePayload = {
   assignedAgentUserId?: string | null;
   assignedAgentDisplayName?: string | null;
   assignedAgentAvatarUrl?: string | null;
+  onlineAgents?: number;
 };
 
 export type WidgetWsChatMessagePayload = {

@@ -78,7 +78,7 @@ export type TerminalWidgetHistoryResponse = {
     };
 };
 
-export type TerminalVisitorConversationItem = {
+export type TerminalContactConversationItem = {
     conversationId: string;
     status: string;
     createdAt: string;
@@ -90,7 +90,13 @@ export type TerminalVisitorConversationItem = {
     metadata: unknown;
 };
 
-export type TerminalVisitorConversationsPayload = {
+// Deprecated: Use TerminalContactConversationItem instead
+export type TerminalVisitorConversationItem = TerminalContactConversationItem;
+
+export type TerminalContactConversationsPayload = {
     success: boolean;
-    data: TerminalVisitorConversationItem[];
+    data: TerminalContactConversationItem[];
 };
+
+// Deprecated: Use TerminalContactConversationsPayload instead
+export type TerminalVisitorConversationsPayload = TerminalContactConversationsPayload;

@@ -10,15 +10,16 @@ import { MessagesView } from "./MessagesView";
 import { ChatView } from "./ChatView";
 import { usePostMessage } from "@/hooks/usePostMessage";
 import { streamChatbotResponse, submitFeedback, streamPlaygroundResponse } from "@/lib/api/response";
-import { getChatHistory, listVisitorConversations } from "@/lib/api/activity";
+import { getChatHistory, listContactConversations } from "@/lib/api/activity";
 import { useChat, type ChatStatus, type ChatMessage as StateChatMessage } from "@/hooks/use-chat-state";
-import { getStoredVisitorId, getStoredConversationId, setStoredConversationId, getStoredLeadGenerated, setStoredLeadGenerated, getStoredLead, setStoredLead } from "@/lib/storage";
+import { getStoredContactId, setStoredContactId, getStoredConversationId, setStoredConversationId, getStoredLeadGenerated, setStoredLeadGenerated, getStoredLead, setStoredLead, type StoredLead } from "@/lib/storage";
 import { WidgetWebSocketClient } from "@/store/widget-websocket-client";
 import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "@/types/websocket";
 import { SOUNDS } from "@/lib/config/sounds";
 import { createLead } from "@/lib/api/leads";
 import { getLeadFormConfig, submitLeadForm } from "@/lib/api/lead-forms";
 import type { LeadForm } from "@/types/lead-forms";
+import { submitOfflineContact } from "@/lib/api/escalate";
 import { MAXIMIZE_WIDTH_SCALE_FACTOR, MAXIMIZE_HEIGHT_SCALE_FACTOR } from "@/lib/constants";
 import { useWidgetSound } from "@/hooks/use-widget-sound";
 import { NUDGE_CONFIG } from "@/lib/nudge-config";
@@ -64,6 +65,16 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
     const wsRoomIdRef = useRef<string | null>(null);
     const [showLeadForm, setShowLeadForm] = useState(false);
     const [leadFormConfig, setLeadFormConfig] = useState<LeadForm | null>(null);
+
+    const [contactId, setContactId] = useState<string | null>(null);
+
+    // No agents online form state
+    const [onlineAgents, setOnlineAgents] = useState<number | null>(null);
+    const [showNoAgentsForm, setShowNoAgentsForm] = useState(false);
+    const [noAgentsFormSubmitted, setNoAgentsFormSubmitted] = useState(false);
+
+    // Stored lead data (from lead gen form)
+    const [storedLead, setStoredLeadState] = useState<StoredLead | null>(null);
 
     // Use our new unified chat hook
     const {
@@ -131,6 +142,20 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                                     : null,
                         });
 
+                        // Capture online agents count
+                        const agentsCount = typeof data?.onlineAgents === "number" ? data.onlineAgents : null;
+                        setOnlineAgents(agentsCount);
+
+                        // Show "no agents online" form when onlineAgents is 0 and escalation is waiting
+                        if (
+                            agentsCount === 0 &&
+                            (data?.status === "REQUESTED" || data?.status === "WAITING_FOR_AGENT") &&
+                            !noAgentsFormSubmitted &&
+                            !showNoAgentsForm
+                        ) {
+                            setShowNoAgentsForm(true);
+                        }
+
                         // If backend reports HUMAN_ACTIVE, route user messages via WS only.
                         if (shouldRouteMessagesToHuman(data?.status)) {
                             setIsHumanActive(true);
@@ -161,6 +186,15 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             },
         });
     }, [addMessage]);
+
+    // Load contact ID from localStorage on widget mount
+    useEffect(() => {
+        if (!config.chatbotId) return;
+        const storedContactId = getStoredContactId(config.chatbotId);
+        if (storedContactId) {
+            setContactId(storedContactId);
+        }
+    }, [config.chatbotId]);
 
     // Connect WS whenever we have a conversationId + escalation (requested/active)
     useEffect(() => {
@@ -298,6 +332,13 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         getLeadFormConfig(config.chatbotId).then(setLeadFormConfig);
     }, [config.chatbotId]);
 
+    // Load stored lead data
+    useEffect(() => {
+        if (!config.chatbotId) return;
+        const lead = getStoredLead(config.chatbotId);
+        setStoredLeadState(lead);
+    }, [config.chatbotId]);
+
     // // Sound Logic
     // // Sound Logic
     // useWidgetSound({
@@ -395,6 +436,10 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         wsClientRef.current?.disconnect();
         wsRoomIdRef.current = null;
         setAssignedAgent({ displayName: null, avatarUrl: null });
+        // Reset no agents online form state
+        setOnlineAgents(null);
+        setShowNoAgentsForm(false);
+        setNoAgentsFormSubmitted(false);
         const newConversation: Conversation = {
             id: Date.now().toString(),
             agent: {
@@ -495,14 +540,14 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
     const refreshConversations = useCallback(async () => {
         if (typeof window === "undefined") return;
-        const visitorId = getStoredVisitorId(config.chatbotId || "");
-        if (!visitorId) {
+        const contactId = getStoredContactId(config.chatbotId || "");
+        if (!contactId) {
             setConversations([]);
             return;
         }
 
         try {
-            const items = await listVisitorConversations(visitorId, config.chatbotId || "");
+            const items = await listContactConversations(contactId, config.chatbotId || "");
             const mapped: Conversation[] = items.map((c) => {
                 const tsRaw = c.lastUserMessageAt || c.lastMessageAt || c.createdAt;
                 const ts = new Date(tsRaw);
@@ -860,10 +905,10 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
     const handleLeadSubmit = useCallback(async (data: Record<string, any>) => {
         try {
-            const visitorId = getStoredVisitorId(config.chatbotId || "");
+            const contactId = getStoredContactId(config.chatbotId || "");
             const convId = conversationId || getStoredConversationId(config.chatbotId || "");
 
-            if (!config.chatbotId || !convId) {
+            if (!config.chatbotId || !convId || !contactId) {
                 console.error("Missing ID for lead submission");
                 return;
             }
@@ -872,7 +917,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                 chatbotId: config.chatbotId,
                 formId: leadFormConfig?.id || "",
                 conversationId: convId,
-                visitorId: visitorId || "unknown", // Should we generate one if missing?
+                contactId: contactId,
                 source: "WIDGET",
                 responses: data
             });
@@ -880,7 +925,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             setStoredLeadGenerated(config.chatbotId);
 
             // Try to set stored lead details if we can map them from system fields
-            // Assuming the LeadForm config has systemField mappings, 
+            // Assuming the LeadForm config has systemField mappings,
             // but we only have raw data here keyed by fieldId.
             // We can iterate leadFormConfig.fields to find system fields.
             if (leadFormConfig) {
@@ -904,6 +949,44 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             throw error; // Re-throw to let form handle error state
         }
     }, [config.chatbotId, conversationId, leadFormConfig]);
+
+    const handleNoAgentsFormSubmit = useCallback(async (data: { name: string; email: string }) => {
+        try {
+            const convId = conversationId || getStoredConversationId(config.chatbotId || "");
+
+            if (!config.chatbotId || !convId || !escalation?.id) {
+                console.error("Missing required data for offline contact submission");
+                return;
+            }
+
+            await submitOfflineContact({
+                chatbotId: config.chatbotId,
+                conversationId: convId,
+                escalationId: escalation.id,
+                name: data.name,
+                email: data.email,
+                submittedAt: new Date().toISOString(),
+            });
+
+            setNoAgentsFormSubmitted(true);
+            setShowNoAgentsForm(false);
+
+            // Add a confirmation message
+            addMessage({
+                role: "assistant",
+                content: `Thanks ${data.name}! We've received your details and will contact you at ${data.email} as soon as an agent becomes available.`,
+                status: "delivered",
+            });
+        } catch (error) {
+            console.error("Failed to submit offline contact:", error);
+            throw error;
+        }
+    }, [config.chatbotId, conversationId, escalation, addMessage]);
+
+    const handleNoAgentsFormDismiss = useCallback(() => {
+        setShowNoAgentsForm(false);
+        setNoAgentsFormSubmitted(true); // Mark as "handled" so it doesn't show again
+    }, []);
 
     // Convert our ChatMessage to the widget Message type
     const widgetMessages: Message[] = messages.map((m) => ({
@@ -969,6 +1052,10 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                     leadForm={leadFormConfig}
                     onLeadSubmit={handleLeadSubmit}
                     onLeadDismiss={() => setShowLeadForm(false)}
+                    showNoAgentsForm={showNoAgentsForm}
+                    onNoAgentsFormSubmit={handleNoAgentsFormSubmit}
+                    onNoAgentsFormDismiss={handleNoAgentsFormDismiss}
+                    storedLead={storedLead}
                 />
             )}
         </div>

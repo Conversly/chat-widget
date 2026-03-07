@@ -26,7 +26,7 @@ export async function createLead(input: CreateLeadInput): Promise<CreateLeadResp
 		email: input.email,
 		phoneNumber: input.phoneNumber,
 		source: input.source,
-		visitorId: input.visitorId,
+		contactId: input.contactId,
 		// topicId: intentionally omitted for now
 	});
 

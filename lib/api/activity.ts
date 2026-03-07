@@ -4,14 +4,14 @@ import type { ApiResponse } from "@/lib/api/config";
 import {
   type ChatHistoryMessage,
   type TerminalWidgetHistoryResponse,
-  type TerminalVisitorConversationItem,
-  type TerminalVisitorConversationsPayload,
+  type TerminalContactConversationItem,
+  type TerminalContactConversationsPayload,
 } from "@/types/activity";
 import { ResponseServiceApiError } from "@/lib/api/errors";
 import type { ResponseServiceErrorPayload, ChatbotHistoryData } from "@/types/response";
 
 // Re-export for consumers that import from this file
-export type { TerminalVisitorConversationItem, TerminalVisitorConversationsPayload };
+export type { TerminalContactConversationItem, TerminalContactConversationsPayload };
 
 export const terminalFetch = axios.create({
   baseURL: API.BASE_URL,
@@ -19,24 +19,24 @@ export const terminalFetch = axios.create({
 });
 
 /**
- * Fetch conversation list for a visitor (terminal service).
- * GET /activity/conversations/by-visitor?visitorId=...
+ * Fetch conversation list for a contact (terminal service).
+ * GET /activity/conversations/by-contact?contactId=...
  */
-export async function listVisitorConversations(
-  visitorId: string,
+export async function listContactConversations(
+  contactId: string,
   chatbotId: string,
-): Promise<TerminalVisitorConversationItem[]> {
-  const vid = (visitorId || "").trim();
+): Promise<TerminalContactConversationItem[]> {
+  const cid = (contactId || "").trim();
   const botId = (chatbotId || "").trim();
-  if (!vid) return [];
+  if (!cid) return [];
 
   const res = await terminalFetch.get<
-    ApiResponse<TerminalVisitorConversationsPayload, Error>
-  >(API.ENDPOINTS.TERMINAL.ACTIVITY.CONVERSATIONS_BY_VISITOR(), {
-    params: { visitorId: vid },
+    ApiResponse<TerminalContactConversationsPayload, Error>
+  >(API.ENDPOINTS.TERMINAL.ACTIVITY.CONVERSATIONS_BY_CONTACT(), {
+    params: { contactId: cid },
     headers: {
       "x-verly-chatbot-id": botId,
-      "x-verly-visitor-id": vid,
+      "x-verly-contact-id": cid,
     }
   });
 

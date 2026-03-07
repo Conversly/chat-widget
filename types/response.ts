@@ -70,7 +70,7 @@ export type ResponseStreamEvent =
   | {
     type: "meta";
     conversation_id?: string;
-    visitor_id?: string;
+    contact_id?: string;
     message_id?: string;
     request_id?: string;
   }

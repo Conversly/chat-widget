@@ -10,7 +10,7 @@ export interface CreateLeadInput {
   phoneNumber: string;
   source: 'WIDGET' | 'WHATSAPP' | 'VOICE' | 'SMS';
   topicId?: string;
-  visitorId: string;
+  contactId: string;
 }
 
 // ============================================================================

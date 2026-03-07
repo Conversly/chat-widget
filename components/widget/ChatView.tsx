@@ -28,6 +28,7 @@ import { ChatInput } from "./ChatInput";
 import { MessageActions } from "./MessageActions";
 
 import { LeadGenerationForm } from "./LeadGenerationForm";
+import { NoAgentsForm } from "./NoAgentsForm";
 import {
     PositiveFeedbackForm,
     NegativeFeedbackForm,
@@ -42,6 +43,7 @@ export interface AssignedAgentInfo {
 }
 
 import type { LeadForm } from "@/types/lead-forms";
+import type { StoredLead } from "@/lib/storage";
 
 interface ChatViewProps {
     config: WidgetConfig;
@@ -64,6 +66,10 @@ interface ChatViewProps {
     leadForm?: LeadForm | null;
     onLeadSubmit?: (data: Record<string, any>) => Promise<void>;
     onLeadDismiss?: () => void;
+    showNoAgentsForm?: boolean;
+    onNoAgentsFormSubmit?: (data: { name: string; email: string }) => Promise<void>;
+    onNoAgentsFormDismiss?: () => void;
+    storedLead?: StoredLead | null;
 }
 
 export function ChatView({
@@ -86,6 +92,10 @@ export function ChatView({
     leadForm,
     onLeadSubmit,
     onLeadDismiss,
+    showNoAgentsForm,
+    onNoAgentsFormSubmit,
+    onNoAgentsFormDismiss,
+    storedLead,
 }: ChatViewProps) {
     const [input, setInput] = useState("");
     const [showNotice, setShowNotice] = useState(true);
@@ -448,6 +458,43 @@ export function ChatView({
                                         leadForm={leadForm || null}
                                         onSubmit={onLeadSubmit}
                                         onDismiss={onLeadDismiss}
+                                    />
+                                </MessageContent>
+                            </MessageBubble>
+                            <div className="mt-1 px-4 text-left">
+                                <span className="text-[10px] text-gray-400">Just now</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* No Agents Online Form as a Message Bubble */}
+                    {showNoAgentsForm && onNoAgentsFormSubmit && onNoAgentsFormDismiss && (
+                        <div className="mb-3">
+                            {/* Avatar */}
+                            <div className="flex items-center gap-2 px-4 mb-1">
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-medium overflow-hidden shrink-0">
+                                    {(assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon) ? (
+                                        <img
+                                            src={assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon}
+                                            alt={assignedAgent?.displayName || "Agent"}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        (assignedAgent?.displayName || "A").charAt(0)
+                                    )}
+                                </div>
+                                <span className="text-xs font-medium text-gray-600">
+                                    {assignedAgent?.displayName || "Assistant"}
+                                </span>
+                            </div>
+
+                            <MessageBubble from="assistant" fullWidth={true}>
+                                <MessageContent>
+                                    <NoAgentsForm
+                                        config={config}
+                                        onSubmit={onNoAgentsFormSubmit}
+                                        onDismiss={onNoAgentsFormDismiss}
+                                        storedLead={storedLead}
                                     />
                                 </MessageContent>
                             </MessageBubble>

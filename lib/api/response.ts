@@ -12,7 +12,7 @@ import {
   type ChatbotHistoryData,
 } from "@/types/response";
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
-import { getStoredVisitorId, setStoredVisitorId, VISITOR_ID_HEADER } from "@/lib/storage";
+import { getStoredContactId, setStoredContactId, CONTACT_ID_HEADER } from "@/lib/storage";
 import { ResponseServiceApiError } from "@/lib/api/errors";
 import { type ChatHistoryMessage, type ChatMessage } from "@/types/activity";
 
@@ -67,7 +67,7 @@ export async function streamChatbotResponse(
   const url = new URL(API.ENDPOINTS.RESPONSE.STREAM(), `${base}/`).toString();
 
   const chatbotId = requestBody.chatbotId; // Must be present now
-  const existingVisitorId = getStoredVisitorId(chatbotId);
+  const existingContactId = getStoredContactId(chatbotId);
   const res = await fetch(url, {
     method: "POST",
     credentials: "include",
@@ -75,17 +75,16 @@ export async function streamChatbotResponse(
       "Content-Type": "application/json",
       Accept: "application/x-ndjson, application/json",
       "x-verly-chatbot-id": chatbotId,
-      ...(existingVisitorId ? { [VISITOR_ID_HEADER]: existingVisitorId } : {}),
+      ...(existingContactId ? { [CONTACT_ID_HEADER]: existingContactId } : {}),
     },
     body: JSON.stringify(requestBody),
     signal,
   });
 
-  // Persist visitor id ASAP so conversationId can be stored under the right key.
-  // Persist visitor id ASAP so conversationId can be stored under the right key.
-  const headerVisitorId = res.headers.get(VISITOR_ID_HEADER);
-  if (headerVisitorId && headerVisitorId.trim()) {
-    setStoredVisitorId(chatbotId, headerVisitorId);
+  // Persist contact id ASAP so conversationId can be stored under the right key.
+  const headerContactId = res.headers.get(CONTACT_ID_HEADER);
+  if (headerContactId && headerContactId.trim()) {
+    setStoredContactId(chatbotId, headerContactId);
   }
 
   if (!res.ok) {
@@ -143,9 +142,9 @@ export async function streamChatbotResponse(
           switch ((event as ResponseStreamEvent).type) {
             case "meta": {
               const meta = event as Extract<ResponseStreamEvent, { type: "meta" }>;
-              const vid = (meta as any)?.visitor_id;
-              if (typeof vid === "string" && vid.trim()) {
-                setStoredVisitorId(chatbotId, vid);
+              const cid = (meta as any)?.contact_id;
+              if (typeof cid === "string" && cid.trim()) {
+                setStoredContactId(chatbotId, cid);
               }
               callbacks.onMeta?.(meta);
               break;
@@ -222,7 +221,7 @@ export async function streamPlaygroundResponse(
   const url = new URL(API.ENDPOINTS.RESPONSE.PLAYGROUND_STREAM(), `${base}/`).toString();
 
   const chatbotId = requestBody.chatbotId;
-  const existingVisitorId = getStoredVisitorId(chatbotId);
+  const existingContactId = getStoredContactId(chatbotId);
 
   const res = await fetch(url, {
     method: "POST",
@@ -231,7 +230,7 @@ export async function streamPlaygroundResponse(
       "Content-Type": "application/json",
       Accept: "application/x-ndjson, application/json",
       "x-verly-chatbot-id": chatbotId,
-      ...(existingVisitorId ? { [VISITOR_ID_HEADER]: existingVisitorId } : {}),
+      ...(existingContactId ? { [CONTACT_ID_HEADER]: existingContactId } : {}),
     },
     body: JSON.stringify(requestBody),
     signal,

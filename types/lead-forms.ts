@@ -55,7 +55,7 @@ export interface SubmitLeadInput {
     chatbotId: string;
     formId: string;
     conversationId?: string;
-    visitorId: string;
+    contactId: string;
     pageUrl?: string;
     source: 'WIDGET' | 'WHATSAPP' | 'VOICE' | 'SMS';
     responses: Record<string, any>; // fieldId -> value

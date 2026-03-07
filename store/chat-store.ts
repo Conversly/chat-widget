@@ -65,6 +65,13 @@ export interface ChatStoreState {
   assignedAgentUserId: string | null
   assignedAgentDisplayName: string | null
   assignedAgentAvatarUrl: string | null
+
+  // Online agent presence (from WS STATE_UPDATE)
+  onlineAgents: number | null
+  /** Whether user has submitted the "no agents online" contact form */
+  noAgentsFormSubmitted: boolean
+  /** Whether to show the "no agents online" form */
+  showNoAgentsForm: boolean
 }
 
 export interface ChatStoreActions {
@@ -85,6 +92,13 @@ export interface ChatStoreActions {
 
   applyResponseMeta: (res: ChatbotResponseData) => void
   resetChat: (opts?: { initialAssistantMessage?: string }) => void
+
+  // No agents online form actions
+  setOnlineAgents: (count: number | null) => void
+  setNoAgentsFormSubmitted: (submitted: boolean) => void
+  setShowNoAgentsForm: (show: boolean) => void
+  submitNoAgentsForm: () => void
+  dismissNoAgentsForm: () => void
 }
 
 export type ChatStore = ChatStoreState & ChatStoreActions
@@ -133,6 +147,11 @@ export function createChatStore({
     assignedAgentDisplayName: null,
     assignedAgentAvatarUrl: null,
 
+    // Online agent presence
+    onlineAgents: null,
+    noAgentsFormSubmitted: false,
+    showNoAgentsForm: false,
+
     // Actions
     setInput: (input) => set({ input }),
     setIsOpen: (isOpen) => set({ isOpen }),
@@ -166,11 +185,26 @@ export function createChatStore({
       })),
 
     onWsStateUpdate: (payload) => {
-      set({
-        wsEscalationStatus: payload.status,
-        assignedAgentUserId: payload.assignedAgentUserId ?? null,
-        assignedAgentDisplayName: payload.assignedAgentDisplayName ?? null,
-        assignedAgentAvatarUrl: payload.assignedAgentAvatarUrl ?? null,
+      set((state) => {
+        const onlineAgents = payload.onlineAgents ?? null
+        // Automatically show the "no agents online" form when:
+        // - onlineAgents is 0 (no agents available)
+        // - Escalation is in a waiting state
+        // - User hasn't already submitted or dismissed the form
+        const shouldShowNoAgentsForm =
+          onlineAgents === 0 &&
+          (payload.status === "REQUESTED" || payload.status === "WAITING_FOR_AGENT") &&
+          !state.noAgentsFormSubmitted &&
+          !state.showNoAgentsForm
+
+        return {
+          wsEscalationStatus: payload.status,
+          assignedAgentUserId: payload.assignedAgentUserId ?? null,
+          assignedAgentDisplayName: payload.assignedAgentDisplayName ?? null,
+          assignedAgentAvatarUrl: payload.assignedAgentAvatarUrl ?? null,
+          onlineAgents,
+          showNoAgentsForm: shouldShowNoAgentsForm ? true : state.showNoAgentsForm,
+        }
       })
     },
 
@@ -248,6 +282,13 @@ export function createChatStore({
       })
     },
 
+    // No agents online form actions
+    setOnlineAgents: (count) => set({ onlineAgents: count }),
+    setNoAgentsFormSubmitted: (submitted) => set({ noAgentsFormSubmitted: submitted }),
+    setShowNoAgentsForm: (show) => set({ showNoAgentsForm: show }),
+    submitNoAgentsForm: () => set({ noAgentsFormSubmitted: true, showNoAgentsForm: false }),
+    dismissNoAgentsForm: () => set({ showNoAgentsForm: false }),
+
     resetChat: (opts) => {
       const initial = opts?.initialAssistantMessage
         ? [
@@ -273,6 +314,9 @@ export function createChatStore({
         assignedAgentUserId: null,
         assignedAgentDisplayName: null,
         assignedAgentAvatarUrl: null,
+        onlineAgents: null,
+        noAgentsFormSubmitted: false,
+        showNoAgentsForm: false,
       })
     },
   }))
