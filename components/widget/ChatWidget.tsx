@@ -445,6 +445,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         setConversationId(null);
         setEscalation(null);
         setIsHumanActive(false);
+        setConversationState(null);
         wsClientRef.current?.disconnect();
         wsRoomIdRef.current = null;
         setAssignedAgent({ displayName: null, avatarUrl: null });
