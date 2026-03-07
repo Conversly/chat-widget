@@ -50,8 +50,7 @@ export const API = {
         BASE_URL: () => "/leads",
       },
       ESCALATE: {
-        BASE_URL: () => "/escalate",
-        HANDLE_ABSENCE: () => "/handle-absence",
+        HANDLE_ABSENCE: () => "/escalate/handle-absence",
       },
     },
 
