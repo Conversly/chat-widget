@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import type { WidgetConfig } from "@/types/chatbot";
+import { UI_TEXT } from "@/lib/constants";
 
 interface StoredLead {
     name: string;
@@ -37,23 +38,25 @@ export function NoAgentsForm({ config, onSubmit, onDismiss, storedLead }: NoAgen
         e.preventDefault();
         setError(null);
 
+        const { fields, validation } = UI_TEXT.noAgentsForm;
+
         // Validation
         const name = formData.name.trim();
         const email = formData.email.trim();
 
         if (!name) {
-            setError("Please enter your name.");
+            setError(fields.name.validationMessage);
             return;
         }
 
         if (!email) {
-            setError("Please enter your email address.");
+            setError(fields.email.validationMessage);
             return;
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            setError("Please enter a valid email address.");
+            setError(validation.invalidEmail);
             return;
         }
 
@@ -61,7 +64,7 @@ export function NoAgentsForm({ config, onSubmit, onDismiss, storedLead }: NoAgen
         try {
             await onSubmit({ name, email });
         } catch (err) {
-            setError("Failed to submit. Please try again.");
+            setError(validation.submitError);
             setIsSubmitting(false);
         }
     };
@@ -70,24 +73,25 @@ export function NoAgentsForm({ config, onSubmit, onDismiss, storedLead }: NoAgen
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
+    const { noAgentsForm } = UI_TEXT;
+
     // Show confirmation state when auto-submitting with stored lead data
     if (storedLead?.name && storedLead?.email) {
         return (
             <div className="w-full space-y-3">
                 <div className="flex items-center gap-2 mb-2">
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span className="text-sm font-medium text-gray-700">Contact Details Confirmed</span>
+                    <span className="text-sm font-medium text-gray-700">{noAgentsForm.confirmationTitle}</span>
                 </div>
 
                 <p className="text-xs text-gray-500">
-                    No support agent is online right now. We&apos;ll contact you at{" "}
-                    <span className="font-medium text-gray-700">{storedLead.email}</span> as soon as an agent becomes available.
+                    {noAgentsForm.confirmationMessage(storedLead.email)}
                 </p>
 
                 {isSubmitting ? (
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Sending your details...</span>
+                        <span>{noAgentsForm.submittingText}</span>
                     </div>
                 ) : error ? (
                     <p className="text-xs text-red-500">{error}</p>
@@ -96,22 +100,23 @@ export function NoAgentsForm({ config, onSubmit, onDismiss, storedLead }: NoAgen
         );
     }
 
+    const { fields, buttons } = noAgentsForm;
+
     return (
         <div className="w-full space-y-3">
             <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">No Agents Available</span>
+                <span className="text-sm font-medium text-gray-700">{noAgentsForm.title}</span>
             </div>
 
             <p className="text-xs text-gray-500 mb-3">
-                No support agent is online right now. We will contact you later to resolve your query.
-                Just drop your email and name.
+                {noAgentsForm.description}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-2">
                 <div>
                     <input
-                        type="text"
-                        placeholder="Your name *"
+                        type={fields.name.type}
+                        placeholder={fields.name.placeholder}
                         value={formData.name}
                         onChange={(e) => handleChange("name", e.target.value)}
                         className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white"
@@ -124,8 +129,8 @@ export function NoAgentsForm({ config, onSubmit, onDismiss, storedLead }: NoAgen
 
                 <div>
                     <input
-                        type="email"
-                        placeholder="Your email *"
+                        type={fields.email.type}
+                        placeholder={fields.email.placeholder}
                         value={formData.email}
                         onChange={(e) => handleChange("email", e.target.value)}
                         className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white"
@@ -146,7 +151,7 @@ export function NoAgentsForm({ config, onSubmit, onDismiss, storedLead }: NoAgen
                         onClick={onDismiss}
                         className="flex-1 py-1.5 px-3 rounded-md text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
                     >
-                        Dismiss
+                        {buttons.dismiss}
                     </button>
                     <button
                         type="submit"
@@ -157,7 +162,7 @@ export function NoAgentsForm({ config, onSubmit, onDismiss, storedLead }: NoAgen
                         {isSubmitting ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
                         ) : (
-                            "Submit"
+                            buttons.submit
                         )}
                     </button>
                 </div>

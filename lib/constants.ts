@@ -95,6 +95,38 @@ export const UI_TEXT = {
     rejectButton: "No, not interested",
   },
 
+  // No Agents Form
+  noAgentsForm: {
+    title: "No Agents Available",
+    description: "No support agent is online right now. We will contact you later to resolve your query. Just drop your email and name.",
+    confirmationTitle: "Contact Details Confirmed",
+    confirmationMessage: (email: string) => `No support agent is online right now. We'll contact you at ${email} as soon as an agent becomes available.`,
+    submittingText: "Sending your details...",
+    fields: {
+      name: {
+        label: "Your name",
+        placeholder: "Your name *",
+        required: true,
+        type: "text" as const,
+        validationMessage: "Please enter your name.",
+      },
+      email: {
+        label: "Your email",
+        placeholder: "Your email *",
+        required: true,
+        type: "email" as const,
+        validationMessage: "Please enter your email address.",
+      },
+    },
+    validation: {
+      invalidEmail: "Please enter a valid email address.",
+      submitError: "Failed to submit. Please try again.",
+    },
+    buttons: {
+      dismiss: "Dismiss",
+      submit: "Submit",
+    },
+  },
 
 } as const;
 
