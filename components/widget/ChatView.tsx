@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChatInput } from "./ChatInput";
 import { MessageActions } from "./MessageActions";
+import { LoadingMessages } from "./LoadingMessages";
 
 import { LeadGenerationForm } from "./LeadGenerationForm";
 import { NoAgentsForm } from "./NoAgentsForm";
@@ -374,11 +375,7 @@ export function ChatView({
                                                     msg.content ? (
                                                         <MessageResponse>{msg.content}</MessageResponse>
                                                     ) : (
-                                                        <div className="flex gap-1 h-5 items-center px-1">
-                                                            <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                                                            <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                                                            <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                                                        </div>
+                                                        <LoadingMessages />
                                                     )
                                                 ) : (
                                                     <span>{msg.content}</span>
