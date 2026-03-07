@@ -97,10 +97,10 @@ function normalizeTerminalHistoryToWidgetHistory(
     citations: [],
     conversation_id: d.conversationId,
     conversation_status: isClosed ? "CLOSED" : "ACTIVE",
+    conversationState: d.conversationState,
     escalation: d.escalation
       ? {
         id: d.escalation.id,
-        status: d.escalation.status,
         ...(d.escalation.reason ? { reason: d.escalation.reason } : {}),
       }
       : undefined,

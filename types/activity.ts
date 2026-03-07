@@ -16,6 +16,16 @@ export type {
     WidgetWsInboundMessage,
 } from "@/types/websocket"
 
+// Keep this in sync with backend `ConversationState` enum and client_v2/types/activity.ts
+export type ConversationState =
+  | "AI_ACTIVE"
+  | "ESCALATED_UNASSIGNED"
+  | "ASSIGNED"
+  | "HUMAN_WAITING_USER"
+  | "USER_WAITING_HUMAN"
+  | "RESOLVED"
+  | "CLOSED";
+
 export type ChatHistoryMessage = {
     message_id: string;
     role: "user" | "assistant";
@@ -67,7 +77,8 @@ export type TerminalWidgetHistoryResponse = {
     data: {
         conversationId: string;
         conversationStatus?: string;
-        escalation: { id: string; status: string; reason?: string | null } | null;
+        conversationState?: ConversationState;
+        escalation: { id: string; status?: string | null; reason?: string | null } | null;
         messages: Array<{
             messageId: string;
             role: string;

@@ -89,18 +89,23 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
     const isLeft = config.position === "bottom-left";
 
-    const shouldConnectWsForEscalationStatus = useCallback((status: unknown) => {
-        if (typeof status !== "string") return false;
+    const shouldConnectWsForEscalationStatus = useCallback((conversationState: unknown) => {
+        if (typeof conversationState !== "string") return false;
         return (
-            status === "REQUESTED" ||
-            status === "WAITING_FOR_AGENT" ||
-            status === "ASSIGNED" ||
-            status === "HUMAN_ACTIVE"
+            conversationState === "ESCALATED_UNASSIGNED" ||
+            conversationState === "ASSIGNED" ||
+            conversationState === "HUMAN_WAITING_USER" ||
+            conversationState === "USER_WAITING_HUMAN"
         );
     }, []);
 
-    const shouldRouteMessagesToHuman = useCallback((status: unknown) => {
-        return status === "HUMAN_ACTIVE";
+    const shouldRouteMessagesToHuman = useCallback((conversationState: unknown) => {
+        if (typeof conversationState !== "string") return false;
+        return (
+            conversationState === "ASSIGNED" ||
+            conversationState === "HUMAN_WAITING_USER" ||
+            conversationState === "USER_WAITING_HUMAN"
+        );
     }, []);
 
     // Instantiate WS client once
@@ -149,15 +154,15 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                         // Show "no agents online" form when onlineAgents is 0 and escalation is waiting
                         if (
                             agentsCount === 0 &&
-                            (data?.status === "REQUESTED" || data?.status === "WAITING_FOR_AGENT") &&
+                            data?.conversationState === "ESCALATED_UNASSIGNED" &&
                             !noAgentsFormSubmitted &&
                             !showNoAgentsForm
                         ) {
                             setShowNoAgentsForm(true);
                         }
 
-                        // If backend reports HUMAN_ACTIVE, route user messages via WS only.
-                        if (shouldRouteMessagesToHuman(data?.status)) {
+                        // If backend reports assigned/active states, route user messages via WS only.
+                        if (shouldRouteMessagesToHuman(data?.conversationState)) {
                             setIsHumanActive(true);
                         }
                         return;
@@ -524,9 +529,10 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
             // If history indicates escalation is requested/active, connect WS immediately.
             const histEsc = (history as any)?.escalation;
-            if (histEsc && shouldConnectWsForEscalationStatus(histEsc.status)) {
+            const histConvState = (history as any)?.conversationState;
+            if (histEsc && shouldConnectWsForEscalationStatus(histConvState)) {
                 setEscalation(histEsc);
-                if (shouldRouteMessagesToHuman(histEsc.status)) {
+                if (shouldRouteMessagesToHuman(histConvState)) {
                     setIsHumanActive(true);
                 }
             } else {
@@ -711,7 +717,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                     onControl: (escalate, reason) => {
                         // Early escalation hint: connect WS ASAP (final response is authoritative).
                         if (escalate) {
-                            setEscalation({ id: "pending", status: "REQUESTED", reason });
+                            setEscalation({ id: "pending", reason });
                         }
                     },
                     onDelta: (_delta, accumulated) => {
@@ -733,7 +739,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                         }
 
                         // Authoritative escalation flag
-                        if (response.escalation && shouldConnectWsForEscalationStatus(response.escalation.status)) {
+                        if (response.escalation && shouldConnectWsForEscalationStatus(response.conversationState)) {
                             setEscalation(response.escalation);
                         } else if (response.escalation) {
                             // Escalation object exists but status isn't in the connect set; still treat as escalated.
@@ -742,8 +748,8 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                             setEscalation(null);
                         }
 
-                        // If backend says escalation is HUMAN_ACTIVE, stop routing to LLM from now on.
-                        if (shouldRouteMessagesToHuman(response.escalation?.status)) {
+                        // If backend says escalation is in active states, stop routing to LLM from now on.
+                        if (shouldRouteMessagesToHuman(response.conversationState)) {
                             setIsHumanActive(true);
                         }
 

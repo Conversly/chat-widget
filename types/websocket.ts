@@ -46,14 +46,13 @@ export type WidgetWsBroadcastEvent<T> = {
 export type WidgetWsStateUpdatePayload = {
   conversationId: string;
   escalationId: string;
-  status:
-    | "REQUESTED"
-    | "WAITING_FOR_AGENT"
+  conversationState:
+    | "ESCALATED_UNASSIGNED"
     | "ASSIGNED"
-    | "HUMAN_ACTIVE"
+    | "HUMAN_WAITING_USER"
+    | "USER_WAITING_HUMAN"
     | "RESOLVED"
-    | "CANCELLED"
-    | "TIMED_OUT"
+    | "CLOSED"
     | (string & {});
   requestedAt?: string;
   reason?: string | null;

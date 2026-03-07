@@ -1,7 +1,7 @@
 import { createStore } from "zustand/vanilla"
 import type { StoreApi } from "zustand/vanilla"
 import type { ChatbotResponseData } from "@/types/response"
-import type { Message, WidgetWsChatMessagePayload, WidgetWsStateUpdatePayload } from "@/types/activity"
+import type { Message, WidgetWsChatMessagePayload, WidgetWsStateUpdatePayload, ConversationState } from "@/types/activity"
 
 export type ConversationPhase =
   | "BOT_ACTIVE"
@@ -56,12 +56,12 @@ export interface ChatStoreState {
   // Escalation / conversation identity
   conversationId: string | null
   escalation: ChatbotResponseData["escalation"] | null
+  conversationState: ConversationState | null
   conversationPhase: ConversationPhase
 
   // Widget state machine + WS runtime (widget-only)
   widgetState: WidgetState
   ws: WidgetWsRuntime
-  wsEscalationStatus: string | null
   assignedAgentUserId: string | null
   assignedAgentDisplayName: string | null
   assignedAgentAvatarUrl: string | null
@@ -138,11 +138,11 @@ export function createChatStore({
 
     conversationId: null,
     escalation: null,
+    conversationState: null,
     conversationPhase: "BOT_ACTIVE",
 
     widgetState: "AI_ONLY",
     ws: { connectionState: "disconnected", roomId: null, lastError: null },
-    wsEscalationStatus: null,
     assignedAgentUserId: null,
     assignedAgentDisplayName: null,
     assignedAgentAvatarUrl: null,
@@ -189,16 +189,16 @@ export function createChatStore({
         const onlineAgents = payload.onlineAgents ?? null
         // Automatically show the "no agents online" form when:
         // - onlineAgents is 0 (no agents available)
-        // - Escalation is in a waiting state
+        // - Escalation is in a waiting state (ESCALATED_UNASSIGNED)
         // - User hasn't already submitted or dismissed the form
         const shouldShowNoAgentsForm =
           onlineAgents === 0 &&
-          (payload.status === "REQUESTED" || payload.status === "WAITING_FOR_AGENT") &&
+          payload.conversationState === "ESCALATED_UNASSIGNED" &&
           !state.noAgentsFormSubmitted &&
           !state.showNoAgentsForm
 
         return {
-          wsEscalationStatus: payload.status,
+          conversationState: payload.conversationState as ConversationState,
           assignedAgentUserId: payload.assignedAgentUserId ?? null,
           assignedAgentDisplayName: payload.assignedAgentDisplayName ?? null,
           assignedAgentAvatarUrl: payload.assignedAgentAvatarUrl ?? null,
@@ -252,8 +252,13 @@ export function createChatStore({
           next.conversationId = res.conversation_id
         }
 
+        // Update conversation state from response if available
+        if (res.conversationState) {
+          next.conversationState = res.conversationState
+        }
+
         // Conversation closed overrides everything else
-        if (res.conversation_status === "CLOSED") {
+        if (res.conversation_status === "CLOSED" || res.conversationState === "CLOSED") {
           next.widgetState = "CLOSED"
           next.conversationPhase = "CLOSED"
           return next as Partial<ChatStore>
@@ -307,10 +312,10 @@ export function createChatStore({
         isTyping: false,
         conversationId: null,
         escalation: null,
+        conversationState: null,
         conversationPhase: "BOT_ACTIVE",
         widgetState: "AI_ONLY",
         ws: { connectionState: "disconnected", roomId: null, lastError: null },
-        wsEscalationStatus: null,
         assignedAgentUserId: null,
         assignedAgentDisplayName: null,
         assignedAgentAvatarUrl: null,

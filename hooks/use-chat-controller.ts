@@ -428,7 +428,8 @@ export function useChatController({
               success: true,
               response: "",
               citations: [],
-              escalation: { id: "pending", status: "PENDING", reason },
+              escalation: { id: "pending", reason },
+              conversationState: "ESCALATED_UNASSIGNED",
             })
           },
           onError: (error, message) => {
@@ -558,7 +559,8 @@ export function useChatController({
             success: true,
             response: "",
             citations: [],
-            escalation: { id: "pending", status: "PENDING", reason },
+            escalation: { id: "pending", reason },
+            conversationState: "ESCALATED_UNASSIGNED",
           })
         },
         onError: (error, message) => {

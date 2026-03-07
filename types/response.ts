@@ -1,4 +1,4 @@
-import { ChatHistoryMessage } from "@/types/activity";
+import { ChatHistoryMessage, ConversationState } from "@/types/activity";
 
 export interface ChatbotResponseRequest {
   query?: string; // JSON stringified messages
@@ -13,12 +13,12 @@ export interface ChatbotResponseData {
   citations?: string[];
   conversation_id?: string;
   conversation_status?: "ACTIVE" | "CLOSED";
+  conversationState?: ConversationState;
   message_id?: string;
   request_id?: string;
   responseId?: string;
   escalation?: {
     id: string;
-    status: string;
     reason?: string;
     requested_at?: string;
   };
