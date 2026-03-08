@@ -5,7 +5,7 @@ export const API = {
    */
   BASE_URL:
     (typeof process !== "undefined" &&
-      (process.env as any)?.NEXT_PUBLIC_TERMINAL_BASE_URL) ||
+      (process.env as any)?.NEXT_PUBLIC_TERMINAL_BASE_URL?.trim()) ||
     "https://terminal.apps.verlyai.xyz/api/v1",
 
   /**
@@ -13,7 +13,7 @@ export const API = {
    * Override via `NEXT_PUBLIC_WS_BASE_URL`.
    */
   WS_BASE_URL:
-    (typeof process !== "undefined" && (process.env as any)?.NEXT_PUBLIC_WS_BASE_URL) ||
+    (typeof process !== "undefined" && (process.env as any)?.NEXT_PUBLIC_WS_BASE_URL?.trim()) ||
     "wss://ws.apps.verlyai.xyz",
 
   /**
@@ -22,7 +22,7 @@ export const API = {
    */
   RESPONSE_BASE_URL:
     (typeof process !== "undefined" &&
-      (process.env as any)?.NEXT_PUBLIC_RESPONSE_BASE_URL) ||
+      (process.env as any)?.NEXT_PUBLIC_RESPONSE_BASE_URL?.trim()) ||
     "https://response.apps.verlyai.xyz",
   ENDPOINTS: {
     /**
@@ -51,6 +51,10 @@ export const API = {
       },
       ESCALATE: {
         HANDLE_ABSENCE: () => "/escalate/handle-absence",
+      },
+      LEAD_FORMS: {
+        GET_CONFIG: (chatbotId: string) => `/lead-forms/${encodeURIComponent(chatbotId)}`,
+        SUBMIT: () => "/lead-forms/submit",
       },
     },
 

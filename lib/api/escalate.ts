@@ -1,6 +1,12 @@
 import axios, { type AxiosResponse } from "axios";
 import { API, type ApiResponse } from "@/lib/api/config";
 
+
+export const terminalFetch = axios.create({
+  baseURL: API.BASE_URL,
+  withCredentials: true,
+});
+
 export interface SubmitOfflineContactRequest {
   chatbotId: string;
   conversationId: string;
@@ -14,11 +20,6 @@ export interface SubmitOfflineContactResponse {
   success: boolean;
 }
 
-
-export const terminalFetch = axios.create({
-  baseURL: API.BASE_URL,
-  withCredentials: true,
-});
 /**
  * Submit contact info when no agents are online during an escalation.
  * POST ${API.ENDPOINTS.TERMINAL.ESCALATE.HANDLE_ABSENCE()}

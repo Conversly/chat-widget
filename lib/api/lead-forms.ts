@@ -9,10 +9,10 @@ import { leadsFetch, CreateLeadResponse } from './leads';
  * GET /lead-forms/:chatbotId
  */
 export async function getLeadFormConfig(chatbotId: string): Promise<LeadForm | null> {
-    const endpoint = `${API.BASE_URL}/lead-forms/${chatbotId}`;
+    const endpoint = API.ENDPOINTS.TERMINAL.LEAD_FORMS.GET_CONFIG(chatbotId);
 
     try {
-        const res = await axios.get<ApiResponse<LeadForm, Error>>(endpoint);
+        const res = await axios.get<ApiResponse<LeadForm, Error>>(API.BASE_URL + endpoint);
 
         if (!res.data.success) {
             console.warn('[LeadForm] Failed to fetch config:', res.data.message);
@@ -31,18 +31,9 @@ export async function getLeadFormConfig(chatbotId: string): Promise<LeadForm | n
  * POST /lead-forms/submit
  */
 export async function submitLeadForm(input: SubmitLeadInput): Promise<CreateLeadResponse> {
-    const endpoint = `${API.BASE_URL}/lead-forms/submit`;
+    const endpoint = API.ENDPOINTS.TERMINAL.LEAD_FORMS.SUBMIT();
 
     try {
-        // We can reuse the leadsFetch instance if it has the right config, 
-        // or just use axios directly if it's a public endpoint (which it likely is for the widget).
-        // Using leadsFetch to be consistent if it adds credentials/headers needed.
-        // However, leadsFetch is configured in leads.ts. Let's use that or a new instance.
-        // The endpoint is public usually, typically secured by chatbotId or a token if needed.
-        // Based on user request "Auth: Public (or Widget Token)", standard axios is fine, 
-        // but let's check if leadsFetch has interceptors we need. 
-        // leadsFetch has `withCredentials: true`. 
-
         const res = await leadsFetch.post<ApiResponse<CreateLeadResponse, Error>>(endpoint, input);
 
         if (!res.data.success) {
