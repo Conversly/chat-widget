@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, JSX } from "react";
 import { ChevronLeft, X, MoreHorizontal, Maximize2, Minimize2, RefreshCw, VolumeX, Volume2, Download, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WidgetConfig } from "@/types/chatbot";
@@ -27,6 +27,7 @@ import {
 import { ChatInput } from "./ChatInput";
 import { MessageActions } from "./MessageActions";
 import { LoadingMessages } from "./LoadingMessages";
+import { TimelineMessage, DateSeparator, type TimelineEventType } from "./TimelineMessage";
 
 import { LeadGenerationForm } from "./LeadGenerationForm";
 import { NoAgentsForm } from "./NoAgentsForm";
@@ -74,6 +75,28 @@ interface ChatViewProps {
     storedLead?: StoredLead | null;
     /** Conversation state to determine if input should be disabled */
     conversationState?: ConversationState | null;
+}
+
+/**
+ * Determine if a message is a timeline/system event
+ */
+function isTimelineMessage(message: Message): boolean {
+    return message.role === "system";
+}
+
+/**
+ * Parse a system message to determine its timeline type
+ */
+function getTimelineEventType(content: string): TimelineEventType {
+    const lower = content.toLowerCase();
+    if (lower.includes("chat started") || lower.includes("conversation started")) return "chat_start";
+    if (lower.includes("joined") && lower.includes("chat")) return "agent_joined";
+    if (lower.includes("left") && lower.includes("chat")) return "agent_left";
+    if (lower.includes("chat ended") || lower.includes("conversation ended")) return "chat_ended";
+    if (lower.includes("escalation") && lower.includes("requested")) return "escalation_requested";
+    if (lower.includes("assigned")) return "escalation_assigned";
+    if (lower === "today" || lower === "yesterday" || !isNaN(Date.parse(content))) return "date_separator";
+    return "custom";
 }
 
 export function ChatView({
@@ -162,37 +185,6 @@ export function ChatView({
         }
     };
 
-    // Format date separator
-    const formatDateSeparator = (date: Date): string => {
-        const now = new Date();
-        const diffDays = Math.floor(
-            (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        if (diffDays === 0) return "Today";
-        if (diffDays === 1) return "Yesterday";
-        return date.toLocaleDateString([], { month: "long", day: "numeric" });
-    };
-
-    // Group messages by date
-    const groupedMessages: { date: Date; messages: Message[] }[] = [];
-    let currentDate: string | null = null;
-
-    messages.forEach((msg) => {
-        const timestamp = msg.timestamp || new Date();
-        const dateStr = timestamp.toDateString();
-        if (dateStr !== currentDate) {
-            currentDate = dateStr;
-            groupedMessages.push({ date: timestamp, messages: [msg] });
-        } else {
-            groupedMessages[groupedMessages.length - 1].messages.push(msg);
-        }
-    });
-
-    // Get suggested messages from config (show only when no user messages yet)
-    const hasUserMessages = messages.some((m) => m.role === "user");
-    const showSuggestions = !hasUserMessages && config.suggestedMessages?.length;
-
     // Download chat history as JSON file
     const handleDownloadChat = () => {
         const chatData = {
@@ -217,10 +209,131 @@ export function ChatView({
         URL.revokeObjectURL(url);
     };
 
+    // Group messages by date and render timeline items
+    const renderMessages = () => {
+        const result: JSX.Element[] = [];
+        let currentDate: string | null = null;
+        let groupIndex = 0;
+
+        // Iterate through messages
+        for (let i = 0; i < messages.length; i++) {
+            const msg = messages[i];
+            const timestamp = msg.timestamp || new Date();
+            const dateStr = timestamp.toDateString();
+
+            // Add date separator when date changes
+            if (dateStr !== currentDate) {
+                currentDate = dateStr;
+                // Add date separator as a timeline message
+                result.push(
+                    <DateSeparator key={`date-${groupIndex}`} date={timestamp} />
+                );
+                groupIndex++;
+            }
+
+            // Check if this is a timeline/system message
+            if (isTimelineMessage(msg)) {
+                const eventType = getTimelineEventType(msg.content);
+                result.push(
+                    <TimelineMessage
+                        key={msg.id}
+                        type={eventType}
+                        content={msg.content}
+                        timestamp={msg.timestamp}
+                    />
+                );
+                continue;
+            }
+
+            // Regular message rendering
+            const isAgent = msg.role === "agent";
+            const agentName = assignedAgent?.displayName || "Agent";
+            const agentAvatar = assignedAgent?.avatarUrl;
+
+            result.push(
+                <div key={msg.id} className="mb-3 group">
+                    {/* Agent identity label (only for agent messages) */}
+                    {isAgent && (
+                        <div className="flex items-center gap-2 px-4 mb-1">
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-medium overflow-hidden shrink-0">
+                                {agentAvatar ? (
+                                    <img src={agentAvatar} alt={agentName} className="w-full h-full object-cover" />
+                                ) : (
+                                    agentName.charAt(0)
+                                )}
+                            </div>
+                            <span className="text-xs font-medium text-gray-600">{agentName}</span>
+                        </div>
+                    )}
+
+                    <MessageBubble
+                        from={msg.role === "user" ? "user" : "assistant"}
+                        onBubbleClick={() => toggleMessageTime(msg.id)}
+                    >
+                        <MessageContent>
+                            {msg.role === "assistant" || isAgent ? (
+                                msg.content ? (
+                                    <MessageResponse>{msg.content}</MessageResponse>
+                                ) : (
+                                    <LoadingMessages />
+                                )
+                            ) : (
+                                <span>{msg.content}</span>
+                            )}
+                            {/* Citations */}
+                            {(() => {
+                                const hasCitations = (msg.role === "assistant" || isAgent) && msg.citations && msg.citations.length > 0;
+                                if (msg.role === "assistant") {
+                                    console.log(`Msg ${msg.id} citations:`, msg.citations);
+                                }
+                                return hasCitations && (
+                                    <MessageCitations citations={msg.citations} />
+                                );
+                            })()}
+                        </MessageContent>
+                    </MessageBubble>
+
+                    {/* Footer: Timestamp + Actions on the same line */}
+                    <div className={cn(
+                        "px-4 mt-1 flex items-center gap-3 min-h-[24px]",
+                        msg.role === "user" ? "justify-end" : "justify-start"
+                    )}>
+                        {(msg.id === messages[messages.length - 1]?.id || revealedMessageIds.has(msg.id)) && (
+                            <MessageTimestamp
+                                date={msg.timestamp || new Date()}
+                                format="time"
+                            />
+                        )}
+
+                        {/* Actions for Assistant Messages */}
+                        {(msg.role === "assistant" || isAgent) && msg.content && (
+                            <MessageActions
+                                config={config}
+                                content={msg.content}
+                                isLast={msg.id === messages[messages.length - 1]?.id}
+                                onRegenerate={() => {
+                                    onRegenerate?.(msg.id);
+                                }}
+                                onFeedback={(type) => {
+                                    setFeedbackState({ messageId: msg.id, type });
+                                    onFeedback?.(msg.id, type);
+                                }}
+                            />
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        return result;
+    };
+
+    // Get suggested messages from config (show only when no user messages yet)
+    const hasUserMessages = messages.some((m) => m.role === "user");
+    const showSuggestions = !hasUserMessages && config.suggestedMessages?.length;
+
     return (
         <div className="h-full flex flex-col bg-white">
-
-
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <div className="flex items-center gap-3">
@@ -230,26 +343,25 @@ export function ChatView({
                     >
                         <ChevronLeft className="w-5 h-5 text-gray-600" />
                     </button>
-                        <div className="flex items-center gap-2">
-                            {/* Agent avatar */}
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br bg-white flex items-center justify-center text-white text-sm font-medium overflow-hidden">
-                                {config.brandLogo ? (
-                                    <img
-                                        src={config.brandLogo}
-                                        alt={conversation.agent.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    conversation.agent.name.charAt(0)
-                                )}
-                            </div>
-                            <div>
-                                <div className="font-semibold text-gray-900 text-sm flex items-center gap-1.5">
-                                    {conversation.agent.name}
-                                </div>
-
+                    <div className="flex items-center gap-2">
+                        {/* Agent avatar */}
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br bg-white flex items-center justify-center text-white text-sm font-medium overflow-hidden">
+                            {config.brandLogo ? (
+                                <img
+                                    src={config.brandLogo}
+                                    alt={conversation.agent.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                conversation.agent.name.charAt(0)
+                            )}
+                        </div>
+                        <div>
+                            <div className="font-semibold text-gray-900 text-sm flex items-center gap-1.5">
+                                {conversation.agent.name}
                             </div>
                         </div>
+                    </div>
                 </div>
                 <div className="flex items-center gap-1">
                     <DropdownMenu modal={false}>
@@ -340,97 +452,7 @@ export function ChatView({
                 style={{ '--chat-scrollbar-color': '#f3f4f6' } as React.CSSProperties}
             >
                 <ConversationContent>
-                    {groupedMessages.map((group, groupIndex) => (
-                        <div key={groupIndex}>
-                            {/* Date separator */}
-                            <div className="flex items-center justify-center my-4">
-                                <span className="text-xs text-gray-400 bg-white px-3">
-                                    {formatDateSeparator(group.date)}
-                                </span>
-                            </div>
-
-                            {/* Messages */}
-                            {group.messages.map((msg) => {
-                                const isAgent = msg.role === "agent";
-                                const agentName = assignedAgent?.displayName || "Agent";
-                                const agentAvatar = assignedAgent?.avatarUrl;
-
-                                return (
-                                    <div key={msg.id} className="mb-3 group">
-                                        {/* Agent identity label (only for agent messages) */}
-                                        {isAgent && (
-                                            <div className="flex items-center gap-2 px-4 mb-1">
-                                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-medium overflow-hidden shrink-0">
-                                                    {agentAvatar ? (
-                                                        <img src={agentAvatar} alt={agentName} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        agentName.charAt(0)
-                                                    )}
-                                                </div>
-                                                <span className="text-xs font-medium text-gray-600">{agentName}</span>
-                                            </div>
-                                        )}
-
-                                        <MessageBubble
-                                            from={msg.role === "user" ? "user" : "assistant"}
-                                            onBubbleClick={() => toggleMessageTime(msg.id)}
-                                        >
-                                            <MessageContent>
-                                                {msg.role === "assistant" || isAgent ? (
-                                                    msg.content ? (
-                                                        <MessageResponse>{msg.content}</MessageResponse>
-                                                    ) : (
-                                                        <LoadingMessages />
-                                                    )
-                                                ) : (
-                                                    <span>{msg.content}</span>
-                                                )}
-                                                {/* Citations */}
-                                                {(() => {
-                                                    const hasCitations = (msg.role === "assistant" || isAgent) && msg.citations && msg.citations.length > 0;
-                                                    if (msg.role === "assistant") {
-                                                        console.log(`Msg ${msg.id} citations:`, msg.citations);
-                                                    }
-                                                    return hasCitations && (
-                                                        <MessageCitations citations={msg.citations} />
-                                                    );
-                                                })()}
-                                            </MessageContent>
-                                        </MessageBubble>
-
-                                        {/* Footer: Timestamp + Actions on the same line */}
-                                        <div className={cn(
-                                            "px-4 mt-1 flex items-center gap-3 min-h-[24px]",
-                                            msg.role === "user" ? "justify-end" : "justify-start"
-                                        )}>
-                                            {(msg.id === messages[messages.length - 1]?.id || revealedMessageIds.has(msg.id)) && (
-                                                <MessageTimestamp
-                                                    date={msg.timestamp || new Date()}
-                                                    format="time"
-                                                />
-                                            )}
-
-                                            {/* Actions for Assistant Messages */}
-                                            {(msg.role === "assistant" || isAgent) && msg.content && (
-                                                <MessageActions
-                                                    config={config}
-                                                    content={msg.content}
-                                                    isLast={msg.id === messages[messages.length - 1]?.id}
-                                                    onRegenerate={() => {
-                                                        onRegenerate?.(msg.id);
-                                                    }}
-                                                    onFeedback={(type) => {
-                                                        setFeedbackState({ messageId: msg.id, type });
-                                                        onFeedback?.(msg.id, type);
-                                                    }}
-                                                />
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ))}
+                    {renderMessages()}
 
                     {/* Lead Generation Form as a Message Bubble */}
                     {showLeadForm && onLeadSubmit && onLeadDismiss && (
