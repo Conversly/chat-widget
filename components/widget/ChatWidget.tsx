@@ -16,7 +16,7 @@ import { getStoredContactId, setStoredContactId, getStoredConversationId, setSto
 import { WidgetWebSocketClient } from "@/store/widget-websocket-client";
 import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "@/types/websocket";
 import { SOUNDS } from "@/lib/config/sounds";
-import { createLead } from "@/lib/api/leads";
+// import { createLead } from "@/lib/api/leads";
 import { getLeadFormConfig, submitLeadForm } from "@/lib/api/lead-forms";
 import type { LeadForm } from "@/types/lead-forms";
 import { submitOfflineContact } from "@/lib/api/escalate";
