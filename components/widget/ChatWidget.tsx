@@ -163,7 +163,8 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                             agentsCount === 0 &&
                             data?.conversationState === "ESCALATED_UNASSIGNED" &&
                             !noAgentsFormSubmitted &&
-                            !showNoAgentsForm
+                            !showNoAgentsForm &&
+                            !getStoredLeadGenerated(config.chatbotId || "")
                         ) {
                             setShowNoAgentsForm(true);
                         }
@@ -987,6 +988,10 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
             setNoAgentsFormSubmitted(true);
             setShowNoAgentsForm(false);
+
+            // Mark lead form as done so it won't show later
+            setStoredLeadGenerated(config.chatbotId);
+            setStoredLead(config.chatbotId, { name: data.name, email: data.email });
 
             // Add a confirmation message
             addMessage({
