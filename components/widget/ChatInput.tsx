@@ -286,28 +286,26 @@ export function ChatInput({
 
                     {/* Right Actions */}
                     <div className="flex items-center gap-2">
-                        {config.enableVoice && (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleVoiceClick}
-                                disabled={disabled}
-                                title={isRecording ? "Stop recording" : "Voice input"}
-                                className={cn(
-                                    "h-8 w-8 rounded-lg transition-all duration-200",
-                                    isRecording
-                                        ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
-                                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                )}
-                            >
-                                {isRecording ? (
-                                    <Square className="h-4 w-4 fill-current" />
-                                ) : (
-                                    <Mic className="h-4 w-4" />
-                                )}
-                            </Button>
-                        )}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleVoiceClick}
+                            disabled={disabled}
+                            title={isRecording ? "Stop recording" : "Voice input"}
+                            className={cn(
+                                "h-8 w-8 rounded-lg transition-all duration-200",
+                                isRecording
+                                    ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
+                                    : "text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            )}
+                        >
+                            {isRecording ? (
+                                <Square className="h-4 w-4 fill-current" />
+                            ) : (
+                                <Mic className="h-4 w-4" />
+                            )}
+                        </Button>
 
                         <Button
                             type="submit"
