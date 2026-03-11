@@ -2,7 +2,12 @@ import axios from 'axios';
 import { API } from '@/lib/api/config';
 import type { ApiResponse } from '@/lib/api/config';
 import type { LeadForm, SubmitLeadInput, LeadFormResponse } from '@/types/lead-forms';
-import { leadsFetch, CreateLeadResponse } from './leads';
+import type { LeadResponse } from '@/types/leads';
+
+const terminalFetch = axios.create({
+  baseURL: API.BASE_URL,
+  withCredentials: true,
+});
 
 /**
  * Fetch the Lead Form configuration for a chatbot.
@@ -30,11 +35,11 @@ export async function getLeadFormConfig(chatbotId: string): Promise<LeadForm | n
  * Submit a lead form response.
  * POST /lead-forms/submit
  */
-export async function submitLeadForm(input: SubmitLeadInput): Promise<CreateLeadResponse> {
+export async function submitLeadForm(input: SubmitLeadInput): Promise<LeadResponse> {
     const endpoint = API.ENDPOINTS.TERMINAL.LEAD_FORMS.SUBMIT();
 
     try {
-        const res = await leadsFetch.post<ApiResponse<CreateLeadResponse, Error>>(endpoint, input);
+        const res = await terminalFetch.post<ApiResponse<LeadResponse, Error>>(endpoint, input);
 
         if (!res.data.success) {
             throw new Error(res.data.message || 'Failed to submit form');
