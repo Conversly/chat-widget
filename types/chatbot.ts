@@ -88,6 +88,9 @@ export interface NewsFeedItem {
 }
 
 export interface WidgetConfig {
+    // Layout mode: "widget" for popup/embed, "fullpage" for ChatGPT-style full-page
+    layoutMode?: "widget" | "fullpage";
+
     // Branding
     brandName: string;
     brandLogo?: string;
@@ -98,6 +101,9 @@ export interface WidgetConfig {
     // Bot Identity
     botName?: string;
     botAvatar?: string;
+
+    // Layout Mode Override
+    isDashboardPanel?: boolean;
     showPoweredBy?: boolean;
 
     // Personalization

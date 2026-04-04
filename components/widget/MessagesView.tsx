@@ -207,13 +207,15 @@ export function MessagesView({
             )}
 
             {/* Bottom Navigation */}
-            <BottomNav
-                config={config}
-                activeTab="messages"
-                onHomeClick={onGoHome}
-                onMessagesClick={() => { }}
-                unreadCount={unreadCount}
-            />
+            {!config.isDashboardPanel && (
+                <BottomNav
+                    config={config}
+                    activeTab="messages"
+                    onHomeClick={onGoHome}
+                    onMessagesClick={() => { }}
+                    unreadCount={unreadCount}
+                />
+            )}
         </div>
     );
 }

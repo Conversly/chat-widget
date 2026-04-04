@@ -10,6 +10,7 @@ interface EmbeddedWidgetProps {
     chatbotId: string;
     testing?: boolean;
     playground?: boolean;
+    layoutMode?: "widget" | "fullpage";
 }
 
 /**
@@ -18,7 +19,7 @@ interface EmbeddedWidgetProps {
  * - Transforms backend config to WidgetConfig format
  * - Supports testing mode
  */
-export function EmbeddedWidget({ chatbotId, testing = false, playground = false }: EmbeddedWidgetProps) {
+export function EmbeddedWidget({ chatbotId, testing = false, playground = false, layoutMode }: EmbeddedWidgetProps) {
     const [apiConfig, setApiConfig] = useState<WidgetConfig | null>(null);
     const [playgroundOverrides, setPlaygroundOverrides] = useState<Partial<WidgetConfig> | null>(
         playground ? { isPlayground: true } : null
@@ -42,6 +43,7 @@ export function EmbeddedWidget({ chatbotId, testing = false, playground = false 
         const merged: WidgetConfig = {
             ...baseConfig,
             ...playgroundOverrides,
+            layoutMode, // Pass the layoutMode prop
             // Ensure nested objects are merged correctly if needed
             playgroundOverrides: {
                 ...baseConfig.playgroundOverrides,
@@ -80,6 +82,7 @@ export function EmbeddedWidget({ chatbotId, testing = false, playground = false 
                             { id: "1", title: "Welcome!", description: "This is a demo widget in testing mode." }
                         ],
                         collectUserFeedback: true,
+                        isDashboardPanel: typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('testing') === 'true' : false,
                     };
                     setApiConfig(defaultConfig);
                     setLoading(false);
@@ -150,6 +153,7 @@ export function EmbeddedWidget({ chatbotId, testing = false, playground = false 
                     // API Credentials
                     chatbotId: String(chatbotId),
                     testing: testing,
+                    isDashboardPanel: typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('testing') === 'true' : false,
                 };
 
                 // console.log("[ChatWidget] Transformed config:", widgetConfig);
