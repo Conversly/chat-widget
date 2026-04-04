@@ -46,6 +46,13 @@ function widgetStateToConversationPhase(state: WidgetState): ConversationPhase {
   }
 }
 
+export type IdentityState =
+  | "unidentified"
+  | "pending"
+  | "verified"
+  | "failed"
+  | "expired"
+
 export interface ChatStoreState {
   // Core chat state
   messages: Message[]
@@ -58,6 +65,11 @@ export interface ChatStoreState {
   escalation: ChatbotResponseData["escalation"] | null
   conversationState: ConversationState | null
   conversationPhase: ConversationPhase
+
+  // Identity verification (JWT-based)
+  identityToken: string | null
+  identityPublicMeta: Record<string, string> | null
+  identityState: IdentityState
 
   // Widget state machine + WS runtime (widget-only)
   widgetState: WidgetState
@@ -99,6 +111,11 @@ export interface ChatStoreActions {
   setShowNoAgentsForm: (show: boolean) => void
   submitNoAgentsForm: () => void
   dismissNoAgentsForm: () => void
+
+  // Identity verification actions
+  setIdentity: (token: string, publicMeta: Record<string, string>) => void
+  clearIdentity: () => void
+  setIdentityState: (state: IdentityState) => void
 }
 
 export type ChatStore = ChatStoreState & ChatStoreActions
@@ -140,6 +157,11 @@ export function createChatStore({
     escalation: null,
     conversationState: null,
     conversationPhase: "BOT_ACTIVE",
+
+    // Identity verification (not persisted to localStorage — starts fresh each page load)
+    identityToken: null,
+    identityPublicMeta: null,
+    identityState: "unidentified",
 
     widgetState: "AI_ONLY",
     ws: { connectionState: "disconnected", roomId: null, lastError: null },
@@ -329,6 +351,21 @@ export function createChatStore({
     submitNoAgentsForm: () => set({ noAgentsFormSubmitted: true, showNoAgentsForm: false }),
     dismissNoAgentsForm: () => set({ showNoAgentsForm: false }),
 
+    // Identity verification actions
+    setIdentity: (token, publicMeta) =>
+      set({
+        identityToken: token,
+        identityPublicMeta: publicMeta,
+        identityState: "pending", // pending until backend verifies on next message
+      }),
+    clearIdentity: () =>
+      set({
+        identityToken: null,
+        identityPublicMeta: null,
+        identityState: "unidentified",
+      }),
+    setIdentityState: (state) => set({ identityState: state }),
+
     resetChat: (opts) => {
       const initial = opts?.initialAssistantMessage
         ? [
@@ -349,6 +386,9 @@ export function createChatStore({
         escalation: null,
         conversationState: null,
         conversationPhase: "BOT_ACTIVE",
+        identityToken: null,
+        identityPublicMeta: null,
+        identityState: "unidentified",
         widgetState: "AI_ONLY",
         ws: { connectionState: "disconnected", roomId: null, lastError: null },
         assignedAgentUserId: null,

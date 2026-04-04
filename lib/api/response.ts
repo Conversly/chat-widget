@@ -54,6 +54,27 @@ function asApiErrorFromResponseText(
   );
 }
 
+/** Identity data to attach to API requests when user is verified */
+export interface IdentityHeaders {
+  token: string | null;
+  publicMeta: Record<string, string> | null;
+}
+
+export const IDENTITY_TOKEN_HEADER = "x-verly-identity-token";
+export const IDENTITY_META_HEADER = "x-verly-identity-meta";
+
+/** Build identity headers if token exists */
+function buildIdentityHeaders(identity?: IdentityHeaders): Record<string, string> {
+  if (!identity?.token) return {};
+  const headers: Record<string, string> = {
+    [IDENTITY_TOKEN_HEADER]: identity.token,
+  };
+  if (identity.publicMeta && Object.keys(identity.publicMeta).length > 0) {
+    headers[IDENTITY_META_HEADER] = btoa(JSON.stringify(identity.publicMeta));
+  }
+  return headers;
+}
+
 /**
  * Stream a chatbot response using NDJSON from `/response/stream`.
  * Resolves with the final `ChatbotResponseData` (same shape as non-streaming `/response`).
@@ -62,6 +83,7 @@ export async function streamChatbotResponse(
   requestBody: ChatbotResponseRequest,
   callbacks: ResponseStreamCallbacks,
   signal?: AbortSignal,
+  identity?: IdentityHeaders,
 ): Promise<ChatbotResponseData> {
   const base = (API.RESPONSE_BASE_URL || "").replace(/\/$/, "");
   const url = new URL(API.ENDPOINTS.RESPONSE.STREAM(), `${base}/`).toString();
@@ -76,6 +98,7 @@ export async function streamChatbotResponse(
       Accept: "application/x-ndjson, application/json",
       "x-verly-chatbot-id": chatbotId,
       ...(existingContactId ? { [CONTACT_ID_HEADER]: existingContactId } : {}),
+      ...buildIdentityHeaders(identity),
     },
     body: JSON.stringify(requestBody),
     signal,

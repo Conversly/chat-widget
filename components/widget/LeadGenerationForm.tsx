@@ -77,7 +77,7 @@ export function LeadGenerationForm({ config, leadForm, onSubmit, onDismiss }: Le
                                 placeholder={field.placeholder || field.label + (field.required ? " *" : "")}
                                 value={formData[field.id] || ""}
                                 onChange={(e) => handleChange(field.id, e.target.value)}
-                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white resize-none"
+                                className="w-full px-3 py-[9px] text-[21px] border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white resize-none"
                                 rows={3}
                                 style={{
                                     // @ts-ignore variable styling
@@ -88,7 +88,7 @@ export function LeadGenerationForm({ config, leadForm, onSubmit, onDismiss }: Le
                             <select
                                 value={formData[field.id] || ""}
                                 onChange={(e) => handleChange(field.id, e.target.value)}
-                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white"
+                                className="w-full px-3 py-[9px] text-[21px] border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white"
                                 style={{
                                     // @ts-ignore variable styling
                                     "--tw-ring-color": config.primaryColor || "#2D5A27"
@@ -109,7 +109,7 @@ export function LeadGenerationForm({ config, leadForm, onSubmit, onDismiss }: Le
                                 placeholder={field.placeholder || field.label + (field.required ? " *" : "")}
                                 value={formData[field.id] || ""}
                                 onChange={(e) => handleChange(field.id, e.target.value)}
-                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white"
+                                className="w-full px-3 py-[9px] text-[21px] border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white"
                                 style={{
                                     // @ts-ignore variable styling
                                     "--tw-ring-color": config.primaryColor || "#2D5A27"

@@ -57,7 +57,7 @@ export function PositiveFeedbackForm({
                     value={issue}
                     onChange={(e) => setIssue(e.target.value)}
                     className={cn(
-                        "w-full px-3 py-2 text-xs border rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-20 transition-all",
+                        "w-full px-3 py-3 text-[18px] border rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-20 transition-all",
                         isDark
                             ? "bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:ring-gray-600"
                             : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:ring-primary"
@@ -188,7 +188,7 @@ export function NegativeFeedbackForm({
                     value={issue}
                     onChange={(e) => setIssue(e.target.value)}
                     className={cn(
-                        "w-full px-3 py-2 text-xs border rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-20 transition-all",
+                        "w-full px-3 py-3 text-[18px] border rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-20 transition-all",
                         isDark
                             ? "bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:ring-gray-600"
                             : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:ring-primary"

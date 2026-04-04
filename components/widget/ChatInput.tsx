@@ -84,7 +84,7 @@ export function ChatInput({
     // Auto-resize textarea, max ~3x original height (36px base -> 108px max)
     useAutosizeTextArea({
         ref: textareaRef,
-        maxHeight: 120, // Increased specificily for rich input
+        maxHeight: 180,
         dependencies: [input],
     })
 
@@ -249,7 +249,7 @@ export function ChatInput({
                     rows={1}
                     disabled={disabled}
                     className={cn(
-                        "w-full px-3 py-2 border-0 bg-transparent resize-none outline-none text-[15px] leading-relaxed",
+                        "w-full px-3 py-2 border-0 bg-transparent resize-none outline-none text-[22px] leading-relaxed",
                         config.appearance === "dark"
                             ? "text-white placeholder:text-gray-500"
                             : "text-gray-900 placeholder:text-gray-400"

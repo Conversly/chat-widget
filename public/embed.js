@@ -354,4 +354,85 @@
 
     window.addEventListener('popstate', checkUrlChange);
 
+    // --- 7. Identity Verification API ---
+    // window.conversly("identify", { token, name?, avatarUrl? })
+    // window.conversly("resetUser")
+
+    /**
+     * Send an identity command to the widget iframe.
+     * @param {string} command - "identify" or "resetUser"
+     * @param {object} [payload] - For identify: { token, ...publicMeta }
+     */
+    function sendIdentityCommand(command, payload) {
+        if (!iframe || !iframe.contentWindow) {
+            // Queue for when iframe is ready
+            window.__verly_identity_queue = window.__verly_identity_queue || [];
+            window.__verly_identity_queue.push({ command: command, payload: payload });
+            // Ensure iframe loads
+            loadIframe();
+            return;
+        }
+
+        if (command === 'identify') {
+            var token = payload && payload.token;
+            if (!token || typeof token !== 'string') return;
+
+            // Separate token from publicMeta
+            var publicMeta = {};
+            for (var key in payload) {
+                if (payload.hasOwnProperty(key) && key !== 'token') {
+                    publicMeta[key] = payload[key];
+                }
+            }
+
+            iframe.contentWindow.postMessage({
+                source: 'verly-widget-host',
+                type: 'widget:identify',
+                payload: { token: token, publicMeta: publicMeta }
+            }, WIDGET_BASE_URL);
+        }
+
+        if (command === 'resetUser') {
+            iframe.contentWindow.postMessage({
+                source: 'verly-widget-host',
+                type: 'widget:reset_user'
+            }, WIDGET_BASE_URL);
+        }
+    }
+
+    // Public API: window.conversly(command, payload)
+    window.conversly = function (command, payload) {
+        if (command === 'identify' || command === 'resetUser') {
+            sendIdentityCommand(command, payload);
+        }
+    };
+
+    // Support pre-load identity config: window.converslyUserConfig
+    if (window.converslyUserConfig && typeof window.converslyUserConfig === 'object') {
+        var preloadConfig = window.converslyUserConfig;
+        if (preloadConfig.token) {
+            // Queue identify call — will be sent when iframe is ready
+            sendIdentityCommand('identify', preloadConfig);
+        }
+    }
+
+    // Flush queued identity commands when widget:ready is received
+    var originalReadyHandler = null; // handled in existing message listener above
+
+    // Patch the widget:ready handler to also flush identity queue
+    var _origMessageHandler = window.addEventListener;
+    window.addEventListener('message', function (event) {
+        if (event.origin !== WIDGET_BASE_URL) return;
+        var data = event.data;
+        if (!data || data.source !== 'verly-widget') return;
+
+        if (data.type === 'widget:ready' && window.__verly_identity_queue) {
+            var queue = window.__verly_identity_queue;
+            window.__verly_identity_queue = null;
+            queue.forEach(function (item) {
+                sendIdentityCommand(item.command, item.payload);
+            });
+        }
+    });
+
 })();

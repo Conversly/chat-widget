@@ -66,6 +66,21 @@ export function setStoredConversationId(chatbotId: string, conversationId: strin
     }
 }
 
+/**
+ * Clear all identity-related localStorage for this chatbot.
+ * Called on resetUser() to prevent stale contact/conversation IDs
+ * from leaking to a different user on the same browser.
+ */
+export function clearStoredIdentity(chatbotId: string): void {
+    if (typeof window === "undefined" || !chatbotId) return
+    try {
+        window.localStorage.removeItem(getStorageKey(chatbotId, KEYS.CONTACT_ID))
+        window.localStorage.removeItem(getStorageKey(chatbotId, KEYS.CONVERSATION_ID))
+    } catch {
+        // ignore
+    }
+}
+
 export function getStoredLeadGenerated(chatbotId: string): boolean {
     if (typeof window === "undefined" || !chatbotId) return false
     try {

@@ -12,7 +12,7 @@ import { usePostMessage } from "@/hooks/usePostMessage";
 import { streamChatbotResponse, submitFeedback, streamPlaygroundResponse } from "@/lib/api/response";
 import { getChatHistory, listContactConversations } from "@/lib/api/activity";
 import { useChat, type ChatStatus, type ChatMessage as StateChatMessage } from "@/hooks/use-chat-state";
-import { getStoredContactId, setStoredContactId, getStoredConversationId, setStoredConversationId, getStoredLeadGenerated, setStoredLeadGenerated, getStoredLead, setStoredLead, type StoredLead } from "@/lib/storage";
+import { getStoredContactId, setStoredContactId, getStoredConversationId, setStoredConversationId, getStoredLeadGenerated, setStoredLeadGenerated, getStoredLead, setStoredLead, clearStoredIdentity, type StoredLead } from "@/lib/storage";
 import { WidgetWebSocketClient } from "@/store/widget-websocket-client";
 import { WidgetWsInboundEventType, type WidgetWsInboundMessage } from "@/types/websocket";
 import { SOUNDS } from "@/lib/config/sounds";
@@ -76,6 +76,10 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
     // Stored lead data (from lead gen form)
     const [storedLead, setStoredLeadState] = useState<StoredLead | null>(null);
+
+    // Identity verification state (JWT-based, not persisted to localStorage)
+    const [identityToken, setIdentityToken] = useState<string | null>(null);
+    const [identityPublicMeta, setIdentityPublicMeta] = useState<Record<string, string> | null>(null);
 
     // Use our new unified chat hook
     const {
@@ -250,6 +254,27 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             type: "widget:closed",
             handler: () => {
                 setIsWidgetOpen(false);
+            }
+        },
+        {
+            type: "widget:identify",
+            handler: (payload: { token: string; publicMeta?: Record<string, string> }) => {
+                if (payload?.token && typeof payload.token === "string") {
+                    setIdentityToken(payload.token);
+                    setIdentityPublicMeta(payload.publicMeta ?? null);
+                }
+            }
+        },
+        {
+            type: "widget:reset_user",
+            handler: () => {
+                setIdentityToken(null);
+                setIdentityPublicMeta(null);
+                // Clear localStorage so stale contact/conversation IDs don't leak to the next user
+                clearStoredIdentity(config.chatbotId || "");
+                // Reset conversation state so next user starts fresh
+                setConversationId(null);
+                setContactId(null);
             }
         }
     ], []);
@@ -789,7 +814,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                         });
                         setStatus("error");
                     },
-                });
+                }, undefined, identityToken ? { token: identityToken, publicMeta: identityPublicMeta } : undefined);
             }
         } catch (error) {
             console.error("[ChatWidget] API error:", error);
@@ -799,7 +824,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             });
             setStatus("error");
         }
-    }, [config, addMessage, updateMessage, setStatus, refreshConversations, shouldConnectWsForEscalationStatus, shouldRouteMessagesToHuman]);
+    }, [config, addMessage, updateMessage, setStatus, refreshConversations, shouldConnectWsForEscalationStatus, shouldRouteMessagesToHuman, identityToken, identityPublicMeta]);
 
     const handleSendMessage = useCallback(async (content: string) => {
         // If a human has taken over, route messages via WS only.
