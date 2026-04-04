@@ -64,7 +64,7 @@ function TestPageContent() {
         const script = document.createElement("script");
         script.src = "/embed.js";
         script.setAttribute("data-chatbot-id", chatbotId);
-        script.setAttribute("data-primary-color", "#4F46E5"); // Indigo-600
+        script.setAttribute("data-primary-color", "#171718ff"); // Indigo-600
         script.async = true;
 
         document.body.appendChild(script);

@@ -46,9 +46,9 @@
     launcher.style.cssText = [
         'position: fixed',
         positionStyles,
-        'width: 60px',
-        'height: 60px',
-        'border-radius: 50%',
+        'width: 68px',
+        'height: 54px',
+        'border-radius: 27px',
         'background-color: ' + config.primaryColor,
         'box-shadow: 0 4px 12px rgba(0,0,0,0.15)',
         'border: none',
@@ -61,8 +61,47 @@
         '-webkit-tap-highlight-color: transparent'
     ].join(';');
 
-    var iconSvg = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" class="msg-icon" style="position:absolute; top:14px; left:14px; transition: opacity 0.2s, transform 0.2s;"><path d="M21 11.5C21.0039 12.8199 20.6357 14.1147 19.9359 15.2259C19.2361 16.3372 18.2323 17.2199 17.0398 17.7719C15.8473 18.324 14.5152 18.5235 13.1973 18.3475C11.8793 18.1716 10.6288 17.6272 9.59 16.777L4 18L5.385 13.418C4.30396 11.9688 3.86411 10.1504 4.14856 8.31198C4.43301 6.47352 5.42232 4.74316 6.92936 3.44759C8.43641 2.15202 10.3556 1.38137 12.3213 1.28066C14.2869 1.17996 16.1627 1.75619 17.59 2.90101C19.6708 4.56846 20.9332 7.0768 21 9.75V11.5Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    var closeSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="close-icon" style="position:absolute; opacity:0; transform: scale(0.5); transition: all 0.2s;"><path d="M18 6L6 18M6 6L18 18" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var iconSvg = `<svg width="45" height="45" viewBox="0 0 58 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Back bubble -->
+  <path 
+    d="M24 6C24 3.8 25.8 2 28 2H48C50.2 2 52 3.8 52 6V18C52 20.2 50.2 22 48 22H40L44 28V22H28C25.8 22 24 20.2 24 18V6Z"
+    fill="white"
+    stroke="white"
+    stroke-width="2"
+    filter="url(#glow)"
+  />
+
+  <!-- Back bubble lines -->
+  <line x1="30" y1="8" x2="46" y2="8" stroke="black" stroke-width="1" stroke-linecap="round"/>
+  <line x1="30" y1="12" x2="44" y2="12" stroke="black" stroke-width="1" stroke-linecap="round"/>
+  <line x1="30" y1="16" x2="42" y2="16" stroke="black" stroke-width="1" stroke-linecap="round"/>
+
+  <!-- Front bubble -->
+  <path 
+    d="M6 16C6 13.8 7.8 12 10 12H30C32.2 12 34 13.8 34 16V26C34 28.2 32.2 30 30 30H18L12 36V30H10C7.8 30 6 28.2 6 26V16Z" 
+    fill="white"
+    stroke="white"
+    stroke-width="2"
+    filter="url(#glow)"
+  />
+
+  <!-- Front bubble lines -->
+  <line x1="12" y1="18" x2="28" y2="18" stroke="black" stroke-width="1" stroke-linecap="round"/>
+  <line x1="12" y1="22" x2="26" y2="22" stroke="black" stroke-width="1" stroke-linecap="round"/>
+  <line x1="12" y1="26" x2="24" y2="26" stroke="black" stroke-width="1" stroke-linecap="round"/>
+
+</svg>
+`; var closeSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="close-icon" style="position:absolute; opacity:0; transform: scale(0.5); transition: all 0.2s;"><path d="M18 6L6 18M6 6L18 18" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
     launcher.innerHTML = iconSvg + closeSvg;
 
