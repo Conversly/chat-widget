@@ -8,6 +8,7 @@ import type { ChatbotResponseData } from "@/types/response";
 import { HomeView } from "./HomeView";
 import { MessagesView } from "./MessagesView";
 import { ChatView } from "./ChatView";
+import { FullPageChat } from "./FullPageChat";
 import { usePostMessage } from "@/hooks/usePostMessage";
 import { streamChatbotResponse, submitFeedback, streamPlaygroundResponse } from "@/lib/api/response";
 import { getChatHistory, listContactConversations } from "@/lib/api/activity";
@@ -50,7 +51,7 @@ const defaultConfig: WidgetConfig = {
 };
 
 export function ChatWidget({ config = defaultConfig, className, defaultOpen = false }: ChatWidgetProps) {
-    const [currentView, setCurrentView] = useState<WidgetView>("home");
+    const [currentView, setCurrentView] = useState<WidgetView>(config.layoutMode === "fullpage" ? "chat" : "home");
     // Track if the widget is currently visible (open) in the parent page
     const [isWidgetOpen, setIsWidgetOpen] = useState(defaultOpen);
     const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -1017,6 +1018,29 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         responseId: m.responseId,
         citations: m.citations,
     }));
+
+    // If layoutMode is fullpage, we render the FullPageChat instead of the popup chrome
+    if (config.layoutMode === "fullpage") {
+        return (
+            <div className="h-full w-full flex flex-col bg-white">
+                <FullPageChat
+                    config={config}
+                    conversation={activeConversation}
+                    messages={widgetMessages}
+                    onSendMessage={handleSendMessage}
+                    onNewChat={handleStartNewConversation}
+                    status={status}
+                    assignedAgent={assignedAgent}
+                    onRegenerate={config.regenerateMessages ? handleRegenerate : undefined}
+                    onFeedback={config.collectUserFeedback ? handleFeedback : undefined}
+                    showLeadForm={showLeadForm}
+                    leadForm={leadFormConfig}
+                    onLeadSubmit={handleLeadSubmit}
+                    onLeadDismiss={() => setShowLeadForm(false)}
+                />
+            </div>
+        );
+    }
 
     return (
         <div

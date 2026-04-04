@@ -418,13 +418,16 @@ export function ChatView({
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                        title="Close"
-                    >
-                        <X className="w-5 h-5 text-gray-600" />
-                    </button>
+                    {/* Hide the inner close button in dashboard panel mode to prevent duplicates */}
+                    {!config.isDashboardPanel && (
+                        <button
+                            onClick={onClose}
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            title="Close"
+                        >
+                            <X className="w-5 h-5 text-gray-600" />
+                        </button>
+                    )}
                 </div>
             </div>
 

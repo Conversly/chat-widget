@@ -66,9 +66,12 @@ export function HomeView({
         <div className="h-full flex flex-col bg-gray-50/50">
             {/* Header with Gradient */}
             <div
-                className="relative px-6 pt-6 pb-24 rounded-b-[2rem] shadow-sm"
+                className={cn(
+                    "relative px-6 pt-6 shadow-sm",
+                    config.isDashboardPanel ? "pb-20 bg-white border-b" : "pb-24 rounded-b-[2rem]"
+                )}
                 style={{
-                    background: `linear-gradient(135deg, ${config.primaryColor}, ${config.primaryColor}dd, ${config.primaryColor}aa)`,
+                    background: config.isDashboardPanel ? "white" : `linear-gradient(135deg, ${config.primaryColor}, ${config.primaryColor}dd, ${config.primaryColor}aa)`,
                 }}
             >
                 {/* Close Button & Header Actions */}
@@ -76,7 +79,7 @@ export function HomeView({
                     <div className="flex items-center gap-2">
                         {/* Optional: Add back button or other header actions here if needed */}
                         {/* For now, just Brand Name/Logo per design */}
-                        <div className="flex items-center gap-2 text-white/90">
+                        <div className={cn("flex items-center gap-2", config.isDashboardPanel ? "text-gray-900" : "text-white/90")}>
                             {config.brandLogo ? (
                                 <img src={config.brandLogo} alt={config.brandName} className="h-6 w-auto object-contain" />
                             ) : config.widgetIcon ? (
@@ -87,17 +90,22 @@ export function HomeView({
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={onClose}
-                            className="text-white/80 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-full"
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
+                        {!config.isDashboardPanel && (
+                            <button
+                                onClick={onClose}
+                                className={cn(
+                                    "transition-colors p-1 rounded-full",
+                                    config.isDashboardPanel ? "text-gray-500 hover:bg-gray-100" : "text-white/80 hover:text-white hover:bg-white/10"
+                                )}
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 {/* Greeting */}
-                <div className="text-white relative z-10">
+                <div className={cn("relative z-10", config.isDashboardPanel ? "text-gray-900" : "text-white")}>
                     <h1 className="text-3xl font-bold flex items-center gap-2">
                         {config.greeting || <>Hi there <span className="animate-wave origin-bottom-right inline-block">👋</span></>}
                     </h1>
@@ -229,13 +237,15 @@ export function HomeView({
             </div>
 
             {/* Bottom Navigation */}
-            <BottomNav
-                config={config}
-                activeTab="home"
-                onHomeClick={() => { }}
-                onMessagesClick={onViewMessages}
-                unreadCount={unreadCount}
-            />
+            {!config.isDashboardPanel && (
+                <BottomNav
+                    config={config}
+                    activeTab="home"
+                    onHomeClick={() => { }}
+                    onMessagesClick={onViewMessages}
+                    unreadCount={unreadCount}
+                />
+            )}
         </div>
     );
 }
