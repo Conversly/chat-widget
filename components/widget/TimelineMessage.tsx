@@ -32,7 +32,7 @@ export function TimelineMessage({
   return (
     <div
       className={cn(
-        "flex items-center justify-center my-4",
+        "flex items-center justify-center my-2",
         className
       )}
     >
@@ -66,7 +66,7 @@ export function DateSeparator({ date }: { date: Date }) {
   const formatted = formatDateForSeparator(date);
 
   return (
-    <div className="flex items-center justify-center my-4">
+    <div className="flex items-center justify-center my-2">
       <div className="px-3 py-1 bg-gray-100 rounded-md text-[11px] font-medium text-gray-400 uppercase tracking-wide">
         {formatted}
       </div>

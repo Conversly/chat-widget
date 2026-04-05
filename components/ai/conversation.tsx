@@ -103,7 +103,7 @@ export function ConversationContent({
     ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
     return (
-        <div className={cn("flex flex-col gap-4 p-4", className)} {...props}>
+        <div className={cn("flex flex-col gap-2 p-4", className)} {...props}>
             {children}
         </div>
     );

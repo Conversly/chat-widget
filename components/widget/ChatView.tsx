@@ -251,7 +251,7 @@ export function ChatView({
             const agentAvatar = assignedAgent?.avatarUrl;
 
             result.push(
-                <div key={msg.id} className="mb-3 group">
+                <div key={msg.id} className="mb-1 group">
                     {/* Agent identity label (only for agent messages) */}
                     {isAgent && (
                         <div className="flex items-center gap-2 px-4 mb-1">
@@ -295,7 +295,7 @@ export function ChatView({
 
                     {/* Footer: Timestamp + Actions on the same line */}
                     <div className={cn(
-                        "px-4 mt-1 flex items-center gap-3 min-h-[24px]",
+                        "px-4 mt-1 flex items-center gap-3",
                         msg.role === "user" ? "justify-end" : "justify-start"
                     )}>
                         {(msg.id === messages[messages.length - 1]?.id || revealedMessageIds.has(msg.id)) && (
