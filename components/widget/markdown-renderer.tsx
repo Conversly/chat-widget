@@ -130,17 +130,39 @@ const COMPONENTS = {
     h4: withClass("h4", "font-semibold text-base mt-1"),
     h5: withClass("h5", "font-medium mt-1"),
     strong: withClass("strong", "font-semibold"),
-    a: ({ node, children, href, ...props }: any) => (
-        <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:text-blue-800"
-            {...props}
-        >
-            {children}
-        </a>
-    ),
+    a: ({ node, children, href, ...props }: any) => {
+        // Determine display text: if children is a raw URL, extract a readable label
+        const childText = typeof children === "string" ? children : "";
+        const isRawUrl = childText.startsWith("http://") || childText.startsWith("https://");
+        let displayText = children;
+        if (isRawUrl) {
+            try {
+                const url = new URL(childText);
+                // Use last meaningful path segment as label
+                const segments = url.pathname.split("/").filter(Boolean);
+                displayText = segments.length > 0
+                    ? segments[segments.length - 1].replace(/[-_]/g, " ")
+                    : url.hostname;
+            } catch {
+                displayText = children;
+            }
+        }
+
+        return (
+            <a
+                href={href}
+                target="_top"
+                className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline underline-offset-2 break-all"
+                title={href}
+                {...props}
+            >
+                <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 1H2C1.44772 1 1 1.44772 1 2V10C1 10.5523 1.44772 11 2 11H10C10.5523 11 11 10.5523 11 10V7M7 1H11M11 1V5M11 1L5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {displayText}
+            </a>
+        );
+    },
     blockquote: withClass("blockquote", "border-l-2 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400"),
     code: ({ children, className, node, ...rest }: any) => {
         const match = /language-(\w+)/.exec(className || "");
