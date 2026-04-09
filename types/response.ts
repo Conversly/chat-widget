@@ -5,6 +5,11 @@ export interface ChatbotResponseRequest {
   mode?: string;
   conversationId?: string;
   chatbotId: string;
+  metadata?: {
+    pageUrl?: string;
+    pageTitle?: string;
+    pageContext?: import("./page-context").PageContext;
+  };
 }
 
 export interface ChatbotResponseData {

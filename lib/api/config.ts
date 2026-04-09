@@ -1,3 +1,6 @@
+// Use direct `process.env.NEXT_PUBLIC_*` access (no `as any`) so Next.js can
+// inline these at compile time. Casts break static replacement in Turbopack/Webpack,
+// which leaves the client bundle on the production fallbacks despite `.env`.
 export const API = {
   /**
    * Terminal service base URL (z-terminal).
@@ -5,7 +8,7 @@ export const API = {
    */
   BASE_URL:
     (typeof process !== "undefined" &&
-      (process.env as any)?.NEXT_PUBLIC_TERMINAL_BASE_URL?.trim()) ||
+      process.env.NEXT_PUBLIC_TERMINAL_BASE_URL?.trim()) ||
     "https://terminal.apps.verlyai.xyz/api/v1",
 
   /**
@@ -13,7 +16,7 @@ export const API = {
    * Override via `NEXT_PUBLIC_WS_BASE_URL`.
    */
   WS_BASE_URL:
-    (typeof process !== "undefined" && (process.env as any)?.NEXT_PUBLIC_WS_BASE_URL?.trim()) ||
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_WS_BASE_URL?.trim()) ||
     "wss://ws.apps.verlyai.xyz",
 
   /**
@@ -21,8 +24,7 @@ export const API = {
    * Override via `NEXT_PUBLIC_RESPONSE_BASE_URL`.
    */
   RESPONSE_BASE_URL:
-    (typeof process !== "undefined" &&
-      (process.env as any)?.NEXT_PUBLIC_RESPONSE_BASE_URL?.trim()) ||
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_RESPONSE_BASE_URL?.trim()) ||
     "https://response.apps.verlyai.xyz",
   ENDPOINTS: {
     /**

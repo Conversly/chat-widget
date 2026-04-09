@@ -35,6 +35,190 @@
     // --- Rate limiter state ---
     var lastNotifyTime = 0;
 
+    // --- Page Context Helpers ---
+    function normalizeText(str, maxLen) {
+        if (!str) return '';
+        var text = str.replace(/\s+/g, ' ').trim();
+        return maxLen && text.length > maxLen ? text.slice(0, maxLen) : text;
+    }
+
+    function redactPII(str) {
+        if (!str) return str;
+        str = str.replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, '[EMAIL]');
+        str = str.replace(/(?:\+?\d{1,3}[\s\-]?)?\(?\d{2,4}\)?[\s\-]?\d{3,4}[\s\-]?\d{3,4}/g, '[PHONE]');
+        str = str.replace(/\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b/g, '[CARD]');
+        return str;
+    }
+
+    function simpleHash(str) {
+        var hash = 5381;
+        for (var i = 0; i < str.length; i++) {
+            hash = ((hash << 5) + hash) + str.charCodeAt(i);
+            hash = hash & hash;
+        }
+        return (hash >>> 0).toString(36);
+    }
+
+    function isElementVisible(el) {
+        if (!el) return false;
+        var style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        if (!el.offsetParent && style.position !== 'fixed' && style.position !== 'sticky') return false;
+        var rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    }
+
+    function dedupeStrings(arr, max) {
+        var seen = {};
+        var result = [];
+        for (var i = 0; i < arr.length && result.length < max; i++) {
+            if (arr[i] && !seen[arr[i]]) {
+                seen[arr[i]] = true;
+                result.push(arr[i]);
+            }
+        }
+        return result;
+    }
+
+    function absoluteUrl(href) {
+        if (!href) return '';
+        try { return new URL(href, window.location.href).href; } catch (e) { return href; }
+    }
+
+    function getAccessibleName(el, maxLen) {
+        var name = el.getAttribute('aria-label');
+        if (!name) {
+            var labelledBy = el.getAttribute('aria-labelledby');
+            if (labelledBy) {
+                var labelEl = document.getElementById(labelledBy);
+                if (labelEl) name = labelEl.textContent;
+            }
+        }
+        if (!name) name = el.textContent;
+        if (!name) name = el.getAttribute('title');
+        if (!name && el.value) name = el.value;
+        return normalizeText(name || '', maxLen);
+    }
+
+    function extractBodyText(maxLen) {
+        var contentSelectors = ['main', 'article', '[role="main"]', '.content', '#content'];
+        var contentEl = null;
+        for (var i = 0; i < contentSelectors.length; i++) {
+            contentEl = document.querySelector(contentSelectors[i]);
+            if (contentEl) break;
+        }
+        var rawText = (contentEl || document.body).innerText;
+        return redactPII(normalizeText(rawText, maxLen));
+    }
+
+    var PAGE_CONTEXT_LIMITS = {
+        title: 160, metaDescription: 240, headingText: 120, maxHeadings: 15,
+        linkText: 80, maxLinks: 30, buttonText: 80, maxButtons: 20,
+        maxFormFields: 15, selectedText: 280, bodyText: 1500, maxTotalPayload: 4000
+    };
+
+    function buildPageContextSnapshot(includeSelectedText) {
+        var url = window.location.href;
+        var title = normalizeText(document.title, PAGE_CONTEXT_LIMITS.title);
+        var metaDescription = normalizeText(
+            (document.querySelector('meta[name="description"]') || {}).content || '', PAGE_CONTEXT_LIMITS.metaDescription
+        );
+        var headings = dedupeStrings(
+            Array.from(document.querySelectorAll('h1,h2,h3,h4'))
+                .filter(isElementVisible)
+                .map(function(el) { return normalizeText(el.textContent, PAGE_CONTEXT_LIMITS.headingText); })
+                .filter(Boolean),
+            PAGE_CONTEXT_LIMITS.maxHeadings
+        );
+        var links = Array.from(document.querySelectorAll('a[href]'))
+            .filter(isElementVisible)
+            .map(function(el) {
+                var text = getAccessibleName(el, PAGE_CONTEXT_LIMITS.linkText);
+                if (!text) return null;
+                return { text: text, href: absoluteUrl(el.getAttribute('href')) };
+            })
+            .filter(Boolean)
+            .slice(0, PAGE_CONTEXT_LIMITS.maxLinks);
+        var buttons = dedupeStrings(
+            Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]'))
+                .filter(isElementVisible)
+                .map(function(el) { return getAccessibleName(el, PAGE_CONTEXT_LIMITS.buttonText); })
+                .filter(Boolean),
+            PAGE_CONTEXT_LIMITS.maxButtons
+        );
+        var formFields = Array.from(document.querySelectorAll('input, select, textarea'))
+            .filter(function(el) {
+                return isElementVisible(el) && el.type !== 'hidden' && el.type !== 'password';
+            })
+            .map(function(el) {
+                var label = '';
+                if (el.id) {
+                    var lbl = document.querySelector('label[for="' + el.id + '"]');
+                    if (lbl) label = normalizeText(lbl.textContent, 80);
+                }
+                if (!label) label = el.getAttribute('aria-label') || '';
+                return {
+                    label: redactPII(label || el.placeholder || el.name || ''),
+                    type: el.type,
+                    name: el.name || ''
+                };
+            })
+            .filter(function(f) { return f.label || f.name; })
+            .slice(0, PAGE_CONTEXT_LIMITS.maxFormFields);
+        var selectedText = includeSelectedText
+            ? redactPII(normalizeText(String(window.getSelection()), PAGE_CONTEXT_LIMITS.selectedText))
+            : '';
+        var bodyText = extractBodyText(PAGE_CONTEXT_LIMITS.bodyText);
+
+        // Structural size cap: loop on real serialized size until under limit.
+        // Trim by priority: bodyText (most compressible) > links > formFields > headings.
+        var maxPayload = PAGE_CONTEXT_LIMITS.maxTotalPayload;
+        var trimSteps = [
+            function() { bodyText = bodyText.slice(0, Math.max(200, bodyText.length - 500)); },
+            function() { bodyText = bodyText.slice(0, 200); },
+            function() { links = links.slice(0, 15); },
+            function() { links = links.slice(0, 8); },
+            function() { formFields = formFields.slice(0, 8); },
+            function() { formFields = formFields.slice(0, 4); },
+            function() { headings = headings.slice(0, 8); },
+            function() { buttons = buttons.slice(0, 10); }
+        ];
+        var stepIdx = 0;
+        while (stepIdx < trimSteps.length) {
+            var testPayload = JSON.stringify({
+                url: url, title: title, metaDescription: metaDescription,
+                headings: headings, links: links, buttons: buttons,
+                formFields: formFields, selectedText: selectedText, bodyText: bodyText
+            });
+            if (testPayload.length <= maxPayload) break;
+            trimSteps[stepIdx]();
+            stepIdx++;
+        }
+
+        var hashInput = url + '|' + title + '|' + headings.join('|') + '|' + bodyText.slice(0, 300);
+        var contentHash = simpleHash(hashInput);
+
+        return {
+            url: url, title: title, metaDescription: metaDescription,
+            headings: headings, links: links, buttons: buttons,
+            formFields: formFields, selectedText: selectedText,
+            bodyText: bodyText, contentHash: contentHash
+        };
+    }
+
+    var syncTimer;
+    function syncPageContext() {
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(function() {
+            if (!iframe || !iframe.contentWindow) return;
+            iframe.contentWindow.postMessage({
+                source: 'verly-widget-host',
+                type: 'widget:page_context',
+                payload: buildPageContextSnapshot()
+            }, WIDGET_BASE_URL);
+        }, 150);
+    }
+
     // --- 1. Create Launcher Button ---
     var launcher = document.createElement('button');
     launcher.id = 'verly-chat-launcher';
@@ -123,6 +307,7 @@ var closeSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" clas
                     payload: { url: window.location.href }
                 }, WIDGET_BASE_URL);
             }
+            syncPageContext();
         };
 
         container.appendChild(iframe);
@@ -166,6 +351,7 @@ var closeSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" clas
                     type: 'widget:opened'
                 }, WIDGET_BASE_URL);
             }
+            syncPageContext();
 
             var popup = document.getElementById('verly-chat-popups');
             if (popup) popup.remove();
@@ -320,6 +506,17 @@ var closeSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" clas
                     payload: { url: window.location.href }
                 }, WIDGET_BASE_URL);
             }
+            syncPageContext();
+        }
+
+        if (data.type === 'widget:request_context') {
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({
+                    source: 'verly-widget-host',
+                    type: 'widget:page_context',
+                    payload: buildPageContextSnapshot(true)
+                }, WIDGET_BASE_URL);
+            }
         }
     });
 
@@ -337,6 +534,7 @@ var closeSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" clas
                     payload: { url: currentUrl }
                 }, WIDGET_BASE_URL);
             }
+            syncPageContext();
         }
     }
 

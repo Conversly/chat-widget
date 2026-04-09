@@ -41,6 +41,7 @@ export interface WidgetAttentionConfig {
 export interface ChatbotCustomizationPartial {
     styles: WidgetStyles;
     callEnabled?: boolean;
+    pageContextEnabled?: boolean;
     attention?: WidgetAttentionConfig;
     initialMessage: string;
     suggestedMessages: string[];
@@ -133,6 +134,7 @@ export interface WidgetConfig {
     regenerateMessages?: boolean;
     continueSuggestedMessages?: boolean;
     dismissableNoticeText?: string;
+    pageContextEnabled?: boolean;
 
     // Suggested Messages
     suggestedMessages?: string[];

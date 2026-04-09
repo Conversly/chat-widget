@@ -58,6 +58,11 @@ export function usePostMessage(options?: { handlers?: MessageHandler[] }) {
         const handleMessage = (event: MessageEvent) => {
             const data = event.data;
 
+            // Validate message origin — only accept from the host that embedded us
+            if (hostOrigin !== "*" && event.origin !== hostOrigin) {
+                return;
+            }
+
             // Only handle messages from our host script with correct source
             if (!data || typeof data !== "object" || data.source !== "verly-widget-host") {
                 return;

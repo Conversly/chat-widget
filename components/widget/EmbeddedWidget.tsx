@@ -126,6 +126,7 @@ export function EmbeddedWidget({ chatbotId, testing = false, playground = false 
                     // Features
                     enableNewsFeed: false,
                     enableVoice: response.partial.callEnabled ?? false,
+                    pageContextEnabled: response.partial.pageContextEnabled ?? false,
                     showAgentAvatars: true,
                     collectUserFeedback: styles.collectUserFeedback ?? true,
                     regenerateMessages: styles.regenerateMessages ?? true,

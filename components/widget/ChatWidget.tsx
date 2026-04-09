@@ -22,6 +22,7 @@ import { submitOfflineContact } from "@/lib/api/escalate";
 import { MAXIMIZE_WIDTH_SCALE_FACTOR, MAXIMIZE_HEIGHT_SCALE_FACTOR } from "@/lib/constants";
 // import { useWidgetSound } from "@/hooks/use-widget-sound";
 import { NUDGE_CONFIG } from "@/lib/nudge-config";
+import type { PageContext } from "@/types/page-context";
 
 interface ChatWidgetProps {
     config: WidgetConfig;
@@ -80,6 +81,12 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
     // Identity verification state (JWT-based, not persisted to localStorage)
     const [identityToken, setIdentityToken] = useState<string | null>(null);
     const [identityPublicMeta, setIdentityPublicMeta] = useState<Record<string, string> | null>(null);
+
+    // Page context state (received from host embed.js)
+    // pageContextRef holds the latest snapshot synchronously (avoids stale React state on send)
+    const [pageContext, setPageContext] = useState<PageContext | null>(null);
+    const pageContextRef = useRef<PageContext | null>(null);
+    const lastSentHashRef = useRef<string | null>(null);
 
     // Use our new unified chat hook
     const {
@@ -276,10 +283,46 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                 setConversationId(null);
                 setContactId(null);
             }
+        },
+        {
+            type: "widget:page_context",
+            handler: (payload: PageContext) => {
+                if (config.pageContextEnabled && payload?.url) {
+                    pageContextRef.current = payload;
+                    setPageContext(payload);
+                }
+            }
         }
     ], []);
 
     const { postToHost } = usePostMessage({ handlers: messageHandlers });
+
+    // Request fresh page context (with selectedText) before sending a message.
+    // 200ms timeout — falls back to last known context if host doesn't respond.
+    // Writes to pageContextRef synchronously so the caller reads fresh data immediately.
+    const PAGE_CONTEXT_REFRESH_TIMEOUT_MS = 200;
+    const refreshPageContext = useCallback((): Promise<void> => {
+        return new Promise((resolve) => {
+            if (!postToHost) { resolve(); return; }
+
+            const timeout = setTimeout(resolve, PAGE_CONTEXT_REFRESH_TIMEOUT_MS);
+            const handler = (event: MessageEvent) => {
+                const data = event.data;
+                if (data?.source === "verly-widget-host" && data?.type === "widget:page_context" && data?.payload?.url) {
+                    clearTimeout(timeout);
+                    window.removeEventListener("message", handler);
+                    // Write to ref synchronously — avoids stale React state race
+                    pageContextRef.current = data.payload;
+                    setPageContext(data.payload);
+                    resolve();
+                }
+            };
+            window.addEventListener("message", handler);
+            postToHost("widget:request_context", {});
+            // Cleanup listener on timeout
+            setTimeout(() => window.removeEventListener("message", handler), PAGE_CONTEXT_REFRESH_TIMEOUT_MS + 50);
+        });
+    }, [postToHost]);
 
     // Send resize message to host when config changes
     useEffect(() => {
@@ -658,7 +701,26 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                     role: "system",
                     content: `User name: ${storedLead.name}`
                 });
-            } if (config.isPlayground && config.playgroundOverrides) {
+            }
+
+            // Refresh page context (selectedText) from host before sending — 200ms timeout
+            // Always send full snapshot on every message — no server-side cache exists yet,
+            // so skipping pageContext would leave get_page_context with no data.
+            let pageMetadata: { pageUrl?: string; pageTitle?: string; pageContext?: PageContext } = {};
+            if (config.pageContextEnabled) {
+                await refreshPageContext();
+                const ctx = pageContextRef.current;
+                if (ctx) {
+                    pageMetadata = {
+                        pageUrl: ctx.url,
+                        pageTitle: ctx.title,
+                        pageContext: ctx,
+                    };
+                    lastSentHashRef.current = ctx.contentHash;
+                }
+            }
+
+            if (config.isPlayground && config.playgroundOverrides) {
                 // Use playground endpoint
                 const requestBody = {
                     query: JSON.stringify(chatMessages),
@@ -670,7 +732,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                         chatbotTemperature: config.playgroundOverrides.temperature || 0.7,
                     },
                     chatbotId: config.playgroundOverrides.chatbotId || config.chatbotId || "",
-                    metadata: {},
+                    metadata: pageMetadata,
                     user: {},
                     conversationId: getStoredConversationId(config.chatbotId || "") || undefined,
                 };
@@ -732,7 +794,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                 const requestBody = {
                     query: JSON.stringify(chatMessages),
                     mode: "default",
-                    metadata: {},
+                    metadata: pageMetadata,
                     user: {},
                     conversationId: getStoredConversationId(config.chatbotId || "") || undefined,
                     chatbotId: config.chatbotId || "",
@@ -824,7 +886,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             });
             setStatus("error");
         }
-    }, [config, addMessage, updateMessage, setStatus, refreshConversations, shouldConnectWsForEscalationStatus, shouldRouteMessagesToHuman, identityToken, identityPublicMeta]);
+    }, [config, addMessage, updateMessage, setStatus, refreshConversations, shouldConnectWsForEscalationStatus, shouldRouteMessagesToHuman, identityToken, identityPublicMeta, refreshPageContext]);
 
     const handleSendMessage = useCallback(async (content: string) => {
         // If a human has taken over, route messages via WS only.
