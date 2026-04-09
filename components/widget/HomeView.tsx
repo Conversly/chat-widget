@@ -180,12 +180,6 @@ export function HomeView({
                         Ask us anything about our platform or system status.
                     </p>
 
-                    {/* Footer / Avatars */}
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">
-                            Typically replies in under 5 mins
-                        </span>
-                    </div>
                 </button>
 
                 {/* Suggested Messages */}
