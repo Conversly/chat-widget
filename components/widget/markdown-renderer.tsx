@@ -130,7 +130,17 @@ const COMPONENTS = {
     h4: withClass("h4", "font-semibold text-base mt-1"),
     h5: withClass("h5", "font-medium mt-1"),
     strong: withClass("strong", "font-semibold"),
-    a: withClass("a", "text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:text-blue-800"),
+    a: ({ node, children, href, ...props }: any) => (
+        <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:text-blue-800"
+            {...props}
+        >
+            {children}
+        </a>
+    ),
     blockquote: withClass("blockquote", "border-l-2 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400"),
     code: ({ children, className, node, ...rest }: any) => {
         const match = /language-(\w+)/.exec(className || "");
