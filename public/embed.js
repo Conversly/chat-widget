@@ -605,6 +605,9 @@ var closeSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" clas
         }
     };
 
+    // Alias: window.verly(command, payload) — same API as window.conversly
+    window.verly = window.conversly;
+
     // Support pre-load identity config: window.converslyUserConfig
     if (window.converslyUserConfig && typeof window.converslyUserConfig === 'object') {
         var preloadConfig = window.converslyUserConfig;
