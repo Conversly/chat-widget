@@ -266,9 +266,17 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         {
             type: "widget:identify",
             handler: (payload: { token: string; publicMeta?: Record<string, string> }) => {
+                console.log("[Identity] widget:identify received", {
+                    hasToken: !!payload?.token,
+                    tokenPrefix: payload?.token?.slice(0, 20) + "...",
+                    publicMeta: payload?.publicMeta,
+                });
                 if (payload?.token && typeof payload.token === "string") {
                     setIdentityToken(payload.token);
                     setIdentityPublicMeta(payload.publicMeta ?? null);
+                    console.log("[Identity] identityToken state set");
+                } else {
+                    console.warn("[Identity] widget:identify received but token is invalid/missing", payload);
                 }
             }
         },
@@ -799,6 +807,12 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                     conversationId: getStoredConversationId(config.chatbotId || "") || undefined,
                     chatbotId: config.chatbotId || "",
                 };
+
+                console.log("[Identity] streamChatbotResponse — identity at send time", {
+                    hasToken: !!identityToken,
+                    tokenPrefix: identityToken?.slice(0, 20) + "...",
+                    publicMeta: identityPublicMeta,
+                });
 
                 await streamChatbotResponse(requestBody, {
                     onMeta: (meta) => {

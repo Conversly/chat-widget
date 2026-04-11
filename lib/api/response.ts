@@ -65,13 +65,17 @@ export const IDENTITY_META_HEADER = "x-verly-identity-meta";
 
 /** Build identity headers if token exists */
 function buildIdentityHeaders(identity?: IdentityHeaders): Record<string, string> {
-  if (!identity?.token) return {};
+  if (!identity?.token) {
+    console.log("[Identity] buildIdentityHeaders — no token, headers omitted");
+    return {};
+  }
   const headers: Record<string, string> = {
     [IDENTITY_TOKEN_HEADER]: identity.token,
   };
   if (identity.publicMeta && Object.keys(identity.publicMeta).length > 0) {
     headers[IDENTITY_META_HEADER] = btoa(JSON.stringify(identity.publicMeta));
   }
+  console.log("[Identity] buildIdentityHeaders — headers built", Object.keys(headers));
   return headers;
 }
 
