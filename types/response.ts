@@ -93,6 +93,15 @@ export type ResponseStreamEvent =
     citations?: string[];
   }
   | {
+    /**
+     * Query clarification / refinement suggestions.
+     * The backend emitted a short-circuit early-return instead of a full
+     * RAG answer. The UI should render these as clickable chips.
+     */
+    type: "suggestions";
+    suggestions: string[];
+  }
+  | {
     type: "final";
     response?: ChatbotResponseData;
   }
@@ -107,6 +116,12 @@ export type ResponseStreamCallbacks = {
   onDelta?: (delta: string, accumulated: string) => void;
   onControl?: (escalate: boolean, reason?: string) => void;
   onCitations?: (citations: string[]) => void;
+  /**
+   * Called when the backend emits a `suggestions` event instead of a full answer.
+   * The UI should render these as clickable chips; clicking one re-sends it as
+   * a user message so the next request goes straight to RAG + generation.
+   */
+  onSuggestions?: (suggestions: string[]) => void;
   onFinal?: (response: ChatbotResponseData) => void;
   onError?: (error: string, message?: string) => void;
   /**

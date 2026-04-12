@@ -154,6 +154,7 @@ export async function streamChatbotResponse(
             (event as any)?.type !== "delta" &&
             (event as any)?.type !== "control" &&
             (event as any)?.type !== "citations" &&
+            (event as any)?.type !== "suggestions" &&
             (event as any)?.type !== "final" &&
             (event as any)?.type !== "error"
           ) {
@@ -193,6 +194,11 @@ export async function streamChatbotResponse(
               const e = event as Extract<ResponseStreamEvent, { type: "citations" }>;
               console.log("NDJSON citation event:", e);
               callbacks.onCitations?.(Array.isArray(e.citations) ? e.citations : []);
+              break;
+            }
+            case "suggestions": {
+              const e = event as Extract<ResponseStreamEvent, { type: "suggestions" }>;
+              callbacks.onSuggestions?.(Array.isArray(e.suggestions) ? e.suggestions : []);
               break;
             }
             case "final": {
@@ -303,6 +309,7 @@ export async function streamPlaygroundResponse(
             (event as any)?.type !== "delta" &&
             (event as any)?.type !== "control" &&
             (event as any)?.type !== "citations" &&
+            (event as any)?.type !== "suggestions" &&
             (event as any)?.type !== "final" &&
             (event as any)?.type !== "error"
           ) {
@@ -336,6 +343,11 @@ export async function streamPlaygroundResponse(
             case "citations": {
               const e = event as Extract<ResponseStreamEvent, { type: "citations" }>;
               callbacks.onCitations?.(Array.isArray(e.citations) ? e.citations : []);
+              break;
+            }
+            case "suggestions": {
+              const e = event as Extract<ResponseStreamEvent, { type: "suggestions" }>;
+              callbacks.onSuggestions?.(Array.isArray(e.suggestions) ? e.suggestions : []);
               break;
             }
             case "final": {
