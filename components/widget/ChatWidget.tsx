@@ -24,10 +24,37 @@ import { MAXIMIZE_WIDTH_SCALE_FACTOR, MAXIMIZE_HEIGHT_SCALE_FACTOR } from "@/lib
 import { NUDGE_CONFIG } from "@/lib/nudge-config";
 import type { PageContext } from "@/types/page-context";
 
+// ---------------------------------------------------------------------------
+// Demo / scripted-reply types
+// ---------------------------------------------------------------------------
+
+export type DemoScriptAction =
+    | { type: "bot_message"; content: string }
+    | { type: "agent_message"; content: string; agentName?: string; agentAvatar?: string }
+    | { type: "escalate"; reason?: string }
+    | { type: "show_lead_form" }
+    | { type: "show_no_agents_form" }
+    | { type: "resolve" }
+    | { type: "close" }
+
+/** One step in the script = what happens after the user sends ONE message.
+ *  Can be a plain string (→ bot_message), a single action, or an array of
+ *  actions that all fire in sequence for that one user turn. */
+export type DemoScriptStep = string | DemoScriptAction | DemoScriptAction[]
+
+export type DemoScript = DemoScriptStep[]
+
+// ---------------------------------------------------------------------------
+
 interface ChatWidgetProps {
     config: WidgetConfig;
     className?: string;
     defaultOpen?: boolean;
+    /** When provided, every user message dequeues the next scripted step
+     *  instead of calling the real API — useful for recording marketing demos. */
+    demoScript?: DemoScript;
+    /** Milliseconds to wait before the bot starts "typing" a scripted reply (default: 0). */
+    demoTypingDelay?: number;
 }
 
 // Default demo config
@@ -49,7 +76,7 @@ const defaultConfig: WidgetConfig = {
     collectUserFeedback: true,
 };
 
-export function ChatWidget({ config = defaultConfig, className, defaultOpen = false }: ChatWidgetProps) {
+export function ChatWidget({ config = defaultConfig, className, defaultOpen = false, demoScript, demoTypingDelay = 0 }: ChatWidgetProps) {
     const [currentView, setCurrentView] = useState<WidgetView>("home");
     // Track if the widget is currently visible (open) in the parent page
     const [isWidgetOpen, setIsWidgetOpen] = useState(defaultOpen);
@@ -64,6 +91,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
     });
     const wsClientRef = useRef<WidgetWebSocketClient | null>(null);
     const wsRoomIdRef = useRef<string | null>(null);
+    const demoScriptIndexRef = useRef(0);
     const [showLeadForm, setShowLeadForm] = useState(false);
     const [leadFormConfig, setLeadFormConfig] = useState<LeadForm | null>(null);
 
@@ -119,6 +147,66 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             conversationState === "USER_WAITING_HUMAN"
         );
     }, []);
+
+    // Reset demo queue whenever a new script is provided
+    useEffect(() => {
+        demoScriptIndexRef.current = 0;
+    }, [demoScript]);
+
+    // Execute a single demo action (bot reply, escalation, form triggers, etc.)
+    const processDemoAction = useCallback(async (action: DemoScriptAction) => {
+        switch (action.type) {
+            case "bot_message": {
+                if (demoTypingDelay > 0) {
+                    await new Promise<void>((r) => setTimeout(r, demoTypingDelay));
+                }
+                const id = addMessage({ role: "assistant", content: "", status: "streaming" });
+                let accumulated = "";
+                for (const char of action.content) {
+                    accumulated += char;
+                    updateMessage(id, { content: accumulated });
+                    await new Promise<void>((r) => setTimeout(r, 20));
+                }
+                updateMessage(id, { status: "delivered" });
+                break;
+            }
+            case "agent_message": {
+                if (demoTypingDelay > 0) {
+                    await new Promise<void>((r) => setTimeout(r, demoTypingDelay));
+                }
+                setAssignedAgent({
+                    displayName: action.agentName ?? null,
+                    avatarUrl: action.agentAvatar ?? null,
+                });
+                addMessage({ role: "agent", content: action.content, status: "delivered" });
+                break;
+            }
+            case "escalate": {
+                setEscalation({ id: "demo-escalation", reason: action.reason });
+                setConversationState("ESCALATED_UNASSIGNED");
+                break;
+            }
+            case "show_lead_form": {
+                setShowLeadForm(true);
+                break;
+            }
+            case "show_no_agents_form": {
+                // Escalation id is required by the dismiss handler — use a fake one
+                setEscalation((prev) => prev ?? { id: "demo-escalation" });
+                setConversationState("ESCALATED_UNASSIGNED");
+                setShowNoAgentsForm(true);
+                break;
+            }
+            case "resolve": {
+                setConversationState("RESOLVED");
+                break;
+            }
+            case "close": {
+                setConversationState("CLOSED");
+                break;
+            }
+        }
+    }, [addMessage, updateMessage, setAssignedAgent, setEscalation, setConversationState, setShowLeadForm, setShowNoAgentsForm, demoTypingDelay]);
 
     // Instantiate WS client once
     useEffect(() => {
@@ -903,6 +991,33 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
     }, [config, addMessage, updateMessage, setStatus, refreshConversations, shouldConnectWsForEscalationStatus, shouldRouteMessagesToHuman, identityToken, identityPublicMeta, refreshPageContext]);
 
     const handleSendMessage = useCallback(async (content: string) => {
+        // DEMO MODE — intercept all sends and play from the scripted queue
+        if (demoScript) {
+            addMessage({ role: "user", content, status: "sent" });
+            setStatus("streaming");
+
+            const idx = demoScriptIndexRef.current;
+            if (idx < demoScript.length) {
+                demoScriptIndexRef.current = idx + 1;
+                const step = demoScript[idx];
+                const actions: DemoScriptAction[] =
+                    typeof step === "string"
+                        ? [{ type: "bot_message", content: step }]
+                        : Array.isArray(step)
+                            ? step
+                            : [step];
+
+                for (const action of actions) {
+                    await processDemoAction(action);
+                }
+            } else {
+                addMessage({ role: "assistant", content: "🎬 End of script.", status: "delivered" });
+            }
+
+            setStatus("ready");
+            return;
+        }
+
         // If a human has taken over, route messages via WS only.
         if (isHumanActive) {
             const convId = getStoredConversationId(config.chatbotId || "");
@@ -944,7 +1059,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         // Process response with new history
         await processResponse([...messages, newMessage]);
 
-    }, [messages, isHumanActive, addMessage, wsRoomIdRef, processResponse]);
+    }, [messages, isHumanActive, addMessage, setStatus, wsRoomIdRef, processResponse, demoScript, processDemoAction]);
 
     const handleRegenerate = useCallback(async (messageId: string) => {
         // Find message index
@@ -1022,6 +1137,12 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
     };
 
     const handleLeadSubmit = useCallback(async (data: Record<string, any>) => {
+        // Demo mode: just close the form without hitting the API
+        if (demoScript) {
+            setShowLeadForm(false);
+            return;
+        }
+
         try {
             const contactId = getStoredContactId(config.chatbotId || "");
             const convId = conversationId || getStoredConversationId(config.chatbotId || "");
@@ -1066,9 +1187,21 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             console.error("Failed to submit lead:", error);
             throw error; // Re-throw to let form handle error state
         }
-    }, [config.chatbotId, conversationId, leadFormConfig]);
+    }, [config.chatbotId, conversationId, leadFormConfig, demoScript]);
 
     const handleNoAgentsFormSubmit = useCallback(async (data: { name: string; email: string }) => {
+        // Demo mode: show confirmation message and close without hitting the API
+        if (demoScript) {
+            setNoAgentsFormSubmitted(true);
+            setShowNoAgentsForm(false);
+            addMessage({
+                role: "assistant",
+                content: `Thanks ${data.name}! We've received your details and will contact you at ${data.email} as soon as an agent becomes available.`,
+                status: "delivered",
+            });
+            return;
+        }
+
         try {
             const convId = conversationId || getStoredConversationId(config.chatbotId || "");
 
@@ -1103,7 +1236,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             console.error("Failed to submit offline contact:", error);
             throw error;
         }
-    }, [config.chatbotId, conversationId, escalation, addMessage]);
+    }, [config.chatbotId, conversationId, escalation, addMessage, demoScript]);
 
     const handleNoAgentsFormDismiss = useCallback(() => {
         setShowNoAgentsForm(false);
