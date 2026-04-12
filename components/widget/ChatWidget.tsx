@@ -851,6 +851,15 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                         console.log("ChatWidget (playground): received citations", citations);
                         updateMessage(assistantMessageId, { citations });
                     },
+                    onSuggestions: (suggestions) => {
+                        // Backend returned refined query options — render as clickable chips.
+                        updateMessage(assistantMessageId, {
+                            content: "",
+                            suggestions,
+                            status: "delivered",
+                        });
+                        setStatus("ready");
+                    },
                     onFinal: (response) => {
                         if (response.conversation_id) {
                             const convId = response.conversation_id;
@@ -869,12 +878,16 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                             }
                         }
 
-                        updateMessage(assistantMessageId, {
-                            content: response.response,
-                            status: "delivered",
-                            citations: response.citations,
-                        });
-                        setStatus("ready");
+                        // If suggestions were already shown, the final is an empty sentinel —
+                        // don't overwrite the suggestion chips with an empty content string.
+                        if (response.response) {
+                            updateMessage(assistantMessageId, {
+                                content: response.response,
+                                status: "delivered",
+                                citations: response.citations,
+                            });
+                            setStatus("ready");
+                        }
                     },
                     onError: (error) => {
                         console.error("[ChatWidget] Playground Stream error:", error);
@@ -927,6 +940,16 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                         console.log("ChatWidget: received citations", citations);
                         updateMessage(assistantMessageId, { citations });
                     },
+                    onSuggestions: (suggestions) => {
+                        // Backend returned refined query options — render as clickable chips.
+                        // Replace the empty streaming placeholder with a suggestion-chip message.
+                        updateMessage(assistantMessageId, {
+                            content: "",
+                            suggestions,
+                            status: "delivered",
+                        });
+                        setStatus("ready");
+                    },
                     onFinal: (response) => {
                         console.log("ChatWidget: received final", response);
                         if (response.conversation_id) {
@@ -961,12 +984,16 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                             }
                         }
 
-                        updateMessage(assistantMessageId, {
-                            content: response.response,
-                            status: "delivered",
-                            responseId: response.responseId,
-                            citations: response.citations,
-                        });
+                        // If suggestions were already shown, the final is an empty sentinel —
+                        // don't overwrite the suggestion chips with an empty content string.
+                        if (response.response) {
+                            updateMessage(assistantMessageId, {
+                                content: response.response,
+                                status: "delivered",
+                                responseId: response.responseId,
+                                citations: response.citations,
+                            });
+                        }
                         setStatus("ready");
                         void refreshConversations();
                     },

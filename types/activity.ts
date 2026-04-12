@@ -54,6 +54,12 @@ export interface Message {
     citations?: string[];
     responseId?: string;
     source?: 'voice';
+    /**
+     * Populated when the assistant message is a query-refinement prompt
+     * (backend returned a `suggestions` stream event instead of a full answer).
+     * The UI renders these as clickable chips; clicking one re-fires the query.
+     */
+    suggestions?: string[];
 }
 
 export interface Conversation {
