@@ -31,6 +31,7 @@ import { TimelineMessage, DateSeparator, type TimelineEventType } from "./Timeli
 
 import { LeadGenerationForm } from "./LeadGenerationForm";
 import { NoAgentsForm } from "./NoAgentsForm";
+import { SuggestionChips } from "./SuggestionChips";
 import {
     PositiveFeedbackForm,
     NegativeFeedbackForm,
@@ -77,6 +78,8 @@ interface ChatViewProps {
     conversationState?: ConversationState | null;
     /** Current streaming request ID for interrupt functionality */
     streamingRequestId?: string | null;
+    /** Called when user clicks a suggestion chip */
+    onSuggestionSelect?: (suggestion: string) => void;
 }
 
 /**
@@ -127,6 +130,7 @@ export function ChatView({
     storedLead,
     conversationState,
     streamingRequestId,
+    onSuggestionSelect,
 }: ChatViewProps) {
     const [input, setInput] = useState("");
     const [showNotice, setShowNotice] = useState(true);
@@ -286,6 +290,8 @@ export function ChatView({
             const isAgent = msg.role === "agent";
             const agentName = assignedAgent?.displayName || "Agent";
             const agentAvatar = assignedAgent?.avatarUrl;
+            const hasSuggestions = !!(msg as any).suggestions?.length;
+            const isStreaming = status === "streaming" && i === messages.length - 1 && msg.role === "assistant";
 
             result.push(
                 <div key={msg.id} className="mb-1 group">
@@ -303,32 +309,49 @@ export function ChatView({
                         </div>
                     )}
 
-                    <MessageBubble
-                        from={msg.role === "user" ? "user" : "assistant"}
-                        onBubbleClick={() => toggleMessageTime(msg.id)}
-                    >
-                        <MessageContent>
-                            {msg.role === "assistant" || isAgent ? (
-                                msg.content ? (
-                                    <MessageResponse>{msg.content}</MessageResponse>
+                    {/* Only render the bubble if there is actual text content OR if it's still streaming */}
+                    {(msg.content || isStreaming) && (
+                        <MessageBubble
+                            from={msg.role === "user" ? "user" : "assistant"}
+                            onBubbleClick={() => toggleMessageTime(msg.id)}
+                        >
+                            <MessageContent>
+                                {msg.role === "assistant" || isAgent ? (
+                                    msg.content ? (
+                                        <MessageResponse>{msg.content}</MessageResponse>
+                                    ) : (
+                                        <LoadingMessages />
+                                    )
                                 ) : (
-                                    <LoadingMessages />
-                                )
-                            ) : (
-                                <span>{msg.content}</span>
-                            )}
-                            {/* Citations */}
-                            {(() => {
-                                const hasCitations = (msg.role === "assistant" || isAgent) && msg.citations && msg.citations.length > 0;
-                                if (msg.role === "assistant") {
-                                    console.log(`Msg ${msg.id} citations:`, msg.citations);
-                                }
-                                return hasCitations && (
-                                    <MessageCitations citations={msg.citations} />
-                                );
-                            })()}
-                        </MessageContent>
-                    </MessageBubble>
+                                    <span>{msg.content}</span>
+                                )}
+                                {/* Citations */}
+                                {(() => {
+                                    const hasCitations = (msg.role === "assistant" || isAgent) && msg.citations && msg.citations.length > 0;
+                                    if (msg.role === "assistant") {
+                                        console.log(`Msg ${msg.id} citations:`, msg.citations);
+                                    }
+                                    return hasCitations && (
+                                        <MessageCitations citations={msg.citations} />
+                                    );
+                                })()}
+                            </MessageContent>
+                        </MessageBubble>
+                    )}
+
+                    {/* Suggestion chips — rendered instead of (or after) the text bubble */}
+                    {hasSuggestions && (
+                        <SuggestionChips
+                            config={config}
+                            suggestions={(msg as any).suggestions}
+                            onSelect={(suggestion) => {
+                                onSuggestionSelect
+                                    ? onSuggestionSelect(suggestion)
+                                    : onSendMessage(suggestion);
+                            }}
+                            disabled={status === "streaming"}
+                        />
+                    )}
 
                     {/* Footer: Timestamp + Actions on the same line */}
                     <div className={cn(

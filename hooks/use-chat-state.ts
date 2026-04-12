@@ -11,6 +11,8 @@ export interface ChatMessage {
     status?: "sending" | "sent" | "streaming" | "delivered" | "error";
     responseId?: string;
     citations?: string[];
+    /** Populated when backend returned a suggestions event instead of a full answer. */
+    suggestions?: string[];
 }
 
 export type ChatStatus = "ready" | "submitted" | "streaming" | "error";
