@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState, useCallback, useEffect } from "react"
-import { Send, Paperclip, Smile, Mic, Square } from "lucide-react"
+import { Send, Paperclip, Smile, Mic, Square, StopCircle } from "lucide-react"
 import type { WidgetConfig } from "@/types/chatbot";
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -15,6 +15,9 @@ interface ChatInputProps {
     handleSuggestionClick: (suggestion: string) => void
     hasUserMessages?: boolean
     disabled?: boolean
+    isStreaming?: boolean
+    onInterrupt?: () => Promise<void>
+    isInterrupting?: boolean
 }
 
 // Web Speech API types
@@ -75,6 +78,9 @@ export function ChatInput({
     handleSuggestionClick,
     hasUserMessages = false,
     disabled = false,
+    isStreaming = false,
+    onInterrupt,
+    isInterrupting = false,
 }: ChatInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [isRecording, setIsRecording] = useState(false)
@@ -307,19 +313,40 @@ export function ChatInput({
                             )}
                         </Button>
 
-                        <Button
-                            type="submit"
-                            size="icon"
-                            disabled={!input.trim() || disabled}
-                            className={cn(
-                                "h-8 w-8 rounded-full transition-all duration-200 flex items-center justify-center",
-                                config.appearance === "dark"
-                                    ? "bg-white text-black hover:bg-gray-200 disabled:bg-gray-800 disabled:text-gray-600"
-                                    : "bg-black text-white hover:bg-gray-800 disabled:bg-gray-100 disabled:text-gray-400"
-                            )}
-                        >
-                            <Send className="h-4 w-4 ml-0.5" />
-                        </Button>
+                        {isStreaming && onInterrupt ? (
+                            <Button
+                                type="button"
+                                size="icon"
+                                onClick={onInterrupt}
+                                disabled={isInterrupting}
+                                className={cn(
+                                    "h-8 w-8 rounded-full transition-all duration-200 flex items-center justify-center",
+                                    "bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400 disabled:text-white",
+                                    isInterrupting && "opacity-70"
+                                )}
+                                title="Stop response"
+                            >
+                                {isInterrupting ? (
+                                    <Square className="h-4 w-4 animate-pulse" />
+                                ) : (
+                                    <StopCircle className="h-4 w-4" />
+                                )}
+                            </Button>
+                        ) : (
+                            <Button
+                                type="submit"
+                                size="icon"
+                                disabled={!input.trim() || disabled}
+                                className={cn(
+                                    "h-8 w-8 rounded-full transition-all duration-200 flex items-center justify-center",
+                                    config.appearance === "dark"
+                                        ? "bg-white text-black hover:bg-gray-200 disabled:bg-gray-800 disabled:text-gray-600"
+                                        : "bg-black text-white hover:bg-gray-800 disabled:bg-gray-100 disabled:text-gray-400"
+                                )}
+                            >
+                                <Send className="h-4 w-4 ml-0.5" />
+                            </Button>
+                        )}
                     </div>
                 </div>
             </form>

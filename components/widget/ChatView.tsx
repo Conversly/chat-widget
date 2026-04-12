@@ -75,6 +75,8 @@ interface ChatViewProps {
     storedLead?: StoredLead | null;
     /** Conversation state to determine if input should be disabled */
     conversationState?: ConversationState | null;
+    /** Current streaming request ID for interrupt functionality */
+    streamingRequestId?: string | null;
 }
 
 /**
@@ -124,11 +126,14 @@ export function ChatView({
     onNoAgentsFormDismiss,
     storedLead,
     conversationState,
+    streamingRequestId,
 }: ChatViewProps) {
     const [input, setInput] = useState("");
     const [showNotice, setShowNotice] = useState(true);
     const [revealedMessageIds, setRevealedMessageIds] = useState<Set<string>>(new Set());
     const [feedbackState, setFeedbackState] = useState<{ messageId: string; type: "positive" | "negative" } | null>(null);
+    const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
+    const [isInterrupting, setIsInterrupting] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -182,6 +187,38 @@ export function ChatView({
             setFeedbackState(null);
         } catch (error) {
             console.error("Failed to submit feedback", error);
+        }
+    };
+
+    // Handle interrupt stream
+    const handleInterruptStream = async () => {
+        if (!streamingRequestId) {
+            console.error("No streaming request ID available");
+            return;
+        }
+
+        setIsInterrupting(true);
+        try {
+            const response = await fetch(
+                `/response/stream/${encodeURIComponent(streamingRequestId)}/interrupt`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(`Interrupt failed: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log("Stream interrupted successfully:", result);
+        } catch (error) {
+            console.error("Failed to interrupt stream:", error);
+        } finally {
+            setIsInterrupting(false);
         }
     };
 
@@ -564,6 +601,9 @@ export function ChatView({
                     handleSuggestionClick={handleSubmit}
                     hasUserMessages={hasUserMessages}
                     disabled={status === "streaming"}
+                    isStreaming={status === "streaming"}
+                    onInterrupt={handleInterruptStream}
+                    isInterrupting={isInterrupting}
                 />
             ) : (
                 <div className="px-4 py-6 text-center border-t border-gray-100 flex flex-col items-center gap-2">
