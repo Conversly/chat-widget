@@ -67,6 +67,8 @@ export const API = {
     RESPONSE: {
       BASE_URL: () => "/response",
       STREAM: () => "/response/stream",
+      STREAM_INTERRUPT: (requestId: string) =>
+        `/response/stream/${encodeURIComponent(requestId)}/interrupt`,
       FEEDBACK: () => "/feedback",
       // response service playground endpoint
       PLAYGROUND: () => "/playground/response",

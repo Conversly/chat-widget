@@ -54,6 +54,10 @@ export interface Message {
     citations?: string[];
     responseId?: string;
     source?: 'voice';
+    /** Assistant message was stopped by the user before the model finished.
+     *  Kept in the UI for context but excluded from the history payload sent
+     *  to the LLM on subsequent turns. */
+    interrupted?: boolean;
 }
 
 export interface Conversation {

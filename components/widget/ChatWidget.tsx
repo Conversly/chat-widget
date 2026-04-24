@@ -9,7 +9,7 @@ import { HomeView } from "./HomeView";
 import { MessagesView } from "./MessagesView";
 import { ChatView } from "./ChatView";
 import { usePostMessage } from "@/hooks/usePostMessage";
-import { streamChatbotResponse, submitFeedback, streamPlaygroundResponse } from "@/lib/api/response";
+import { streamChatbotResponse, submitFeedback, streamPlaygroundResponse, interruptStream } from "@/lib/api/response";
 import { getChatHistory, listContactConversations } from "@/lib/api/activity";
 import { useChat, type ChatStatus, type ChatMessage as StateChatMessage } from "@/hooks/use-chat-state";
 import { getStoredContactId, setStoredContactId, getStoredConversationId, setStoredConversationId, getStoredLeadGenerated, setStoredLeadGenerated, getStoredLead, setStoredLead, clearStoredIdentity, type StoredLead } from "@/lib/storage";
@@ -113,6 +113,14 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
     // Page context state (received from host embed.js)
     // pageContextRef holds the latest snapshot synchronously (avoids stale React state on send)
     const [pageContext, setPageContext] = useState<PageContext | null>(null);
+    const [streamingRequestId, setStreamingRequestId] = useState<string | null>(null);
+    const [isInterrupting, setIsInterrupting] = useState(false);
+    // Track per-send cancel intent + accumulated content so the stop handler
+    // can finalize the assistant bubble locally without waiting for the server's
+    // final event. Any late stream callbacks check `cancelledRef` and bail.
+    const cancelledRef = useRef(false);
+    const accumulatedContentRef = useRef("");
+    const currentAssistantMessageIdRef = useRef<string | null>(null);
     const pageContextRef = useRef<PageContext | null>(null);
     const lastSentHashRef = useRef<string | null>(null);
 
@@ -603,6 +611,37 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         setIsMuted(prev => !prev);
     }, []);
 
+    const handleInterruptStream = useCallback(async () => {
+        if (isInterrupting) return;
+
+        // 1) Act locally first so the UI unsticks immediately — never wait on the
+        //    server's final event (which may be slow or empty).
+        cancelledRef.current = true;
+        const accumulated = accumulatedContentRef.current;
+        const msgId = currentAssistantMessageIdRef.current;
+        if (msgId) {
+            updateMessage(msgId, {
+                content: accumulated || "_Response stopped._",
+                status: "delivered",
+                interrupted: true,
+            });
+        }
+        setStatus("ready");
+        setIsInterrupting(true);
+
+        // 2) Best-effort backend cancel. If it 404s (stream already finished) or
+        //    errors, the local state is already correct — we just log.
+        if (streamingRequestId) {
+            try {
+                const identity = identityToken ? { token: identityToken, publicMeta: identityPublicMeta } : undefined;
+                await interruptStream(streamingRequestId, config.chatbotId || "", identity);
+            } catch (error) {
+                console.error("[ChatWidget] Failed to interrupt stream on server:", error);
+            }
+        }
+        setIsInterrupting(false);
+    }, [streamingRequestId, isInterrupting, identityToken, identityPublicMeta, config.chatbotId, updateMessage, setStatus]);
+
     const handleStartNewConversation = useCallback(() => {
         // Force response-service to create a fresh conversation.
         setStoredConversationId(config.chatbotId || "", null);
@@ -767,6 +806,11 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
             status: "streaming",
         });
 
+        // Reset per-send interrupt tracking
+        cancelledRef.current = false;
+        accumulatedContentRef.current = "";
+        currentAssistantMessageIdRef.current = assistantMessageId;
+
         // If no API credentials, use dummy response
         if (!config.chatbotId) {
             console.warn("[ChatWidget] No API credentials, using dummy response");
@@ -783,11 +827,17 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
         setStatus("streaming");
 
         try {
-            // Convert messages to backend format
-            const chatMessages: ApiChatMessage[] = history.map((m) => ({
-                role: (m.role === "agent" ? "assistant" : m.role) as "user" | "assistant" | "system",
-                content: m.content,
-            }));
+            // Convert messages to backend format.
+            // Skip assistant turns the user stopped — the "_Response stopped._"
+            // placeholder has no signal for the model and would pollute context.
+            // The user message before it is preserved so the model sees the
+            // question being asked again.
+            const chatMessages: ApiChatMessage[] = history
+                .filter((m) => !(m.role === "assistant" && m.interrupted))
+                .map((m) => ({
+                    role: (m.role === "agent" ? "assistant" : m.role) as "user" | "assistant" | "system",
+                    content: m.content,
+                }));
 
             // Inject lead context if available and not already present (checking message text just in case)
             const storedLead = getStoredLead(config.chatbotId || "");
@@ -835,6 +885,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
                 await streamPlaygroundResponse(requestBody, {
                     onMeta: (meta) => {
+                        if (cancelledRef.current) return;
                         if (meta.conversation_id) {
                             const convId = meta.conversation_id;
                             setStoredConversationId(config.chatbotId || "", convId);
@@ -843,15 +894,20 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                                 prev ? { ...prev, id: convId } : prev
                             );
                         }
+                        if (meta.request_id) setStreamingRequestId(meta.request_id);
                     },
                     onDelta: (_delta, accumulated) => {
+                        if (cancelledRef.current) return;
+                        accumulatedContentRef.current = accumulated;
                         updateMessage(assistantMessageId, { content: accumulated });
                     },
                     onCitations: (citations) => {
+                        if (cancelledRef.current) return;
                         console.log("ChatWidget (playground): received citations", citations);
                         updateMessage(assistantMessageId, { citations });
                     },
                     onFinal: (response) => {
+                        if (cancelledRef.current) return;
                         if (response.conversation_id) {
                             const convId = response.conversation_id;
                             setStoredConversationId(config.chatbotId || "", convId);
@@ -877,6 +933,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                         setStatus("ready");
                     },
                     onError: (error) => {
+                        if (cancelledRef.current) return;
                         console.error("[ChatWidget] Playground Stream error:", error);
                         updateMessage(assistantMessageId, {
                             content: "Sorry, there was an error. Please try again.",
@@ -904,6 +961,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
 
                 await streamChatbotResponse(requestBody, {
                     onMeta: (meta) => {
+                        if (cancelledRef.current) return;
                         if (meta.conversation_id) {
                             const convId = meta.conversation_id;
                             setStoredConversationId(config.chatbotId || "", convId);
@@ -913,21 +971,27 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                                 prev ? { ...prev, id: convId } : prev
                             );
                         }
+                        if (meta.request_id) setStreamingRequestId(meta.request_id);
                     },
                     onControl: (escalate, reason) => {
+                        if (cancelledRef.current) return;
                         // Early escalation hint: connect WS ASAP (final response is authoritative).
                         if (escalate) {
                             setEscalation({ id: "pending", reason });
                         }
                     },
                     onDelta: (_delta, accumulated) => {
+                        if (cancelledRef.current) return;
+                        accumulatedContentRef.current = accumulated;
                         updateMessage(assistantMessageId, { content: accumulated });
                     },
                     onCitations: (citations) => {
+                        if (cancelledRef.current) return;
                         console.log("ChatWidget: received citations", citations);
                         updateMessage(assistantMessageId, { citations });
                     },
                     onFinal: (response) => {
+                        if (cancelledRef.current) return;
                         console.log("ChatWidget: received final", response);
                         if (response.conversation_id) {
                             const convId = response.conversation_id;
@@ -971,6 +1035,7 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                         void refreshConversations();
                     },
                     onError: (error) => {
+                        if (cancelledRef.current) return;
                         console.error("[ChatWidget] Stream error:", error);
                         updateMessage(assistantMessageId, {
                             content: "Sorry, there was an error. Please try again.",
@@ -981,12 +1046,21 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                 }, undefined, identityToken ? { token: identityToken, publicMeta: identityPublicMeta } : undefined);
             }
         } catch (error) {
-            console.error("[ChatWidget] API error:", error);
-            updateMessage(assistantMessageId, {
-                content: "Sorry, there was an error connecting to the service.",
-                status: "error",
-            });
-            setStatus("error");
+            if (cancelledRef.current) {
+                // User-initiated stop; the interrupt handler already finalized the UI.
+                console.log("[ChatWidget] Stream ended by user interrupt");
+            } else {
+                console.error("[ChatWidget] API error:", error);
+                updateMessage(assistantMessageId, {
+                    content: "Sorry, there was an error connecting to the service.",
+                    status: "error",
+                });
+                setStatus("error");
+            }
+        } finally {
+            setStreamingRequestId(null);
+            setIsInterrupting(false);
+            currentAssistantMessageIdRef.current = null;
         }
     }, [config, addMessage, updateMessage, setStatus, refreshConversations, shouldConnectWsForEscalationStatus, shouldRouteMessagesToHuman, identityToken, identityPublicMeta, refreshPageContext]);
 
@@ -1312,6 +1386,9 @@ export function ChatWidget({ config = defaultConfig, className, defaultOpen = fa
                     onNoAgentsFormDismiss={handleNoAgentsFormDismiss}
                     storedLead={storedLead}
                     conversationState={conversationState}
+                    streamingRequestId={streamingRequestId}
+                    onInterruptStream={handleInterruptStream}
+                    isInterrupting={isInterrupting}
                 />
             )}
         </div>

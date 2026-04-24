@@ -11,6 +11,9 @@ export interface ChatMessage {
     status?: "sending" | "sent" | "streaming" | "delivered" | "error";
     responseId?: string;
     citations?: string[];
+    /** Assistant message was stopped by the user before the model finished.
+     *  Excluded from the history payload sent to the LLM on subsequent turns. */
+    interrupted?: boolean;
 }
 
 export type ChatStatus = "ready" | "submitted" | "streaming" | "error";

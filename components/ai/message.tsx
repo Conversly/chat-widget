@@ -24,10 +24,16 @@ export function Message({ from, children, className, onBubbleClick, fullWidth, p
     // Assistant: no bubble by default (flush-left plain text).
     //   If `card` is set, wrap in a subtle bordered card (for forms, rich content).
     const innerClass = isUser
-        ? cn("rounded-2xl px-3.5 py-2.5 max-w-full text-white rounded-br-sm", fullWidth ? "w-full" : "")
+        ? cn(
+            "rounded-2xl px-3.5 py-2.5 max-w-full rounded-br-sm bg-gray-200 text-gray-900",
+            fullWidth ? "w-full" : ""
+        )
         : card
             ? "border border-gray-100 rounded-2xl px-4 py-3 bg-white w-full"
             : cn("text-gray-900 px-4", fullWidth ? "w-full" : "max-w-full");
+
+    // Only override with primaryColor if a caller explicitly passes one.
+    const userStyle = isUser && primaryColor ? { backgroundColor: primaryColor, color: "white" } : undefined;
 
     return (
         <div
@@ -40,7 +46,7 @@ export function Message({ from, children, className, onBubbleClick, fullWidth, p
         >
             <div
                 onClick={onBubbleClick}
-                style={isUser ? { backgroundColor: primaryColor || "#111111" } : undefined}
+                style={userStyle}
                 className={cn(innerClass, onBubbleClick && "cursor-pointer")}
             >
                 {children}

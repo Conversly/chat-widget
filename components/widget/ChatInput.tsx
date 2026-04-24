@@ -18,6 +18,8 @@ interface ChatInputProps {
     isStreaming?: boolean
     onInterrupt?: () => Promise<void>
     isInterrupting?: boolean
+    /** False until the server has sent the requestId meta event — stop button stays disabled. */
+    canInterrupt?: boolean
 }
 
 // Web Speech API types
@@ -76,6 +78,7 @@ export function ChatInput({
     isStreaming = false,
     onInterrupt,
     isInterrupting = false,
+    canInterrupt = true,
 }: ChatInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [isRecording, setIsRecording] = useState(false)
@@ -262,13 +265,13 @@ export function ChatInput({
                                 type="button"
                                 size="icon"
                                 onClick={onInterrupt}
-                                disabled={isInterrupting}
+                                disabled={isInterrupting || !canInterrupt}
                                 className={cn(
                                     "h-8 w-8 rounded-full transition-all duration-200",
-                                    isInterrupting && "opacity-60"
+                                    (isInterrupting || !canInterrupt) && "opacity-60"
                                 )}
                                 style={{ backgroundColor: config.primaryColor, color: "white" }}
-                                title="Stop response"
+                                title={canInterrupt ? "Stop response" : "Preparing…"}
                             >
                                 <Square className="h-3.5 w-3.5 fill-current" />
                             </Button>

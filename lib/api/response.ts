@@ -236,6 +236,37 @@ export async function streamChatbotResponse(
 }
 
 /**
+ * Interrupt an active chatbot stream identified by `requestId`.
+ * Returns `true` if the server accepted the interrupt, `false` if the stream
+ * had already finished (404) — both are benign from the caller's perspective.
+ */
+export async function interruptStream(
+  requestId: string,
+  chatbotId: string,
+  identity?: IdentityHeaders,
+): Promise<boolean> {
+  const base = (API.RESPONSE_BASE_URL || "").replace(/\/$/, "");
+  const url = new URL(API.ENDPOINTS.RESPONSE.STREAM_INTERRUPT(requestId), `${base}/`).toString();
+
+  const res = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      "x-verly-chatbot-id": chatbotId,
+      ...buildIdentityHeaders(identity),
+    },
+  });
+
+  if (res.status === 404) return false;
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    throw asApiErrorFromResponseText(res.status, res.statusText, bodyText);
+  }
+  return true;
+}
+
+/**
  * Stream a playground response using NDJSON from `/playground/response/stream`.
  * Resolves with the final `ChatbotResponseData` (same shape as non-streaming `/playground/response`).
  */
