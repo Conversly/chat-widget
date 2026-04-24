@@ -408,7 +408,7 @@ export function ChatView({
     const showSuggestions = !hasUserMessages && config.suggestedMessages?.length;
 
     return (
-        <div className="h-full flex flex-col bg-[#fafafa]">
+        <div className="relative h-full flex flex-col bg-[#fafafa]">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white">
                 <div className="flex items-center gap-3">
@@ -529,36 +529,6 @@ export function ChatView({
                 <ConversationContent>
                     {renderMessages()}
 
-                    {/* Lead Generation Form as a Message Bubble */}
-                    {showLeadForm && onLeadSubmit && onLeadDismiss && (
-                        <div className="mb-3">
-                            {/* Avatar */}
-                            <div className="flex items-center gap-2 px-4 mb-1 mt-2">
-                                <AssistantAvatar
-                                    src={assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon}
-                                    name={assignedAgent?.displayName || config.botName || config.brandName || "Assistant"}
-                                />
-                                <span className="text-sm font-semibold text-gray-900">
-                                    {assignedAgent?.displayName || config.botName || config.brandName || "Assistant"}
-                                </span>
-                            </div>
-
-                            <MessageBubble from="assistant" fullWidth={true} card={true}>
-                                <MessageContent>
-                                    <LeadGenerationForm
-                                        config={config}
-                                        leadForm={leadForm || null}
-                                        onSubmit={onLeadSubmit}
-                                        onDismiss={onLeadDismiss}
-                                    />
-                                </MessageContent>
-                            </MessageBubble>
-                            <div className="mt-1 px-4 text-left">
-                                <span className="text-[10px] text-gray-400">Just now</span>
-                            </div>
-                        </div>
-                    )}
-
                     {/* No Agents Online Form as a Message Bubble */}
                     {showNoAgentsForm && onNoAgentsFormSubmit && onNoAgentsFormDismiss && (
                         <div className="mb-3">
@@ -666,6 +636,15 @@ export function ChatView({
                 </div>
             )}
 
-        </div >
+            {/* Lead Generation Form — bottom drawer overlay */}
+            {showLeadForm && onLeadSubmit && onLeadDismiss && (
+                <LeadGenerationForm
+                    config={config}
+                    leadForm={leadForm || null}
+                    onSubmit={onLeadSubmit}
+                    onDismiss={onLeadDismiss}
+                />
+            )}
+        </div>
     );
 }
