@@ -12,9 +12,11 @@ interface MessageProps extends React.HTMLAttributes<HTMLDivElement> {
     children: React.ReactNode;
     onBubbleClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
     fullWidth?: boolean;
+    primaryColor?: string;
 }
 
-export function Message({ from, children, className, onBubbleClick, fullWidth, ...props }: MessageProps) {
+export function Message({ from, children, className, onBubbleClick, fullWidth, primaryColor, ...props }: MessageProps) {
+    const userBg = primaryColor || "#111111";
     return (
         <div
             className={cn(
@@ -26,13 +28,14 @@ export function Message({ from, children, className, onBubbleClick, fullWidth, .
         >
             <div
                 onClick={onBubbleClick}
+                style={from === "user" ? { backgroundColor: userBg } : undefined}
                 className={cn(
-                    "rounded-2xl px-4 py-3",
+                    "rounded-2xl px-3.5 py-2.5",
                     fullWidth ? "w-full" : "max-w-full",
                     onBubbleClick && "cursor-pointer",
                     from === "user"
-                        ? "bg-black text-white rounded-br-md"
-                        : "bg-gray-100 text-gray-900 rounded-bl-md"
+                        ? "text-white rounded-br-sm"
+                        : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"
                 )}
             >
                 {children}
@@ -50,7 +53,7 @@ export function MessageContent({
     ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
     return (
-        <div className={cn("text-sm", className)} {...props}>
+        <div className={cn("text-[13.5px] leading-relaxed", className)} {...props}>
             {children}
         </div>
     );
@@ -198,6 +201,7 @@ export function MessageStatus({ status, className, ...props }: MessageStatusProp
  * MessageCitations - Citations list with image carousel
  */
 import { ImageCarousel } from "@/components/widget/ImageCarousel";
+import { Badge } from "@/components/ui/badge";
 
 interface MessageCitationsProps {
     citations?: string[];
@@ -259,38 +263,50 @@ export function MessageCitations({ citations }: MessageCitationsProps) {
                 <ImageCarousel images={images} />
             )}
 
-            {/* Link Citations (CitationsBlock style) */}
+            {/* Link Citations */}
             {links.length > 0 && (
                 <div className="w-full">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] text-gray-500 mr-0.5">
-                            Sources:
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-gray-400 mr-0.5">
+                            Sources
                         </span>
                         {visibleLinks.map((citation, index) => {
                             const parsed = parseCitation(citation);
                             if (!parsed.label) return null;
 
-                            const Chip = parsed.href ? "a" : "span";
-                            return (
-                                <Chip
-                                    key={`${citation}-${index}`}
-                                    {...(parsed.href
-                                        ? { href: parsed.href, target: "_blank", rel: "noopener noreferrer" }
-                                        : {})}
-                                    className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-600 border border-gray-100"
-                                    title={citation}
-                                >
-                                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-gray-200 text-[9px] font-medium text-gray-600">
+                            const inner = (
+                                <>
+                                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-gray-200 text-[9px] font-semibold text-gray-600">
                                         {index + 1}
                                     </span>
                                     <span className="max-w-[120px] truncate">{parsed.label}</span>
-                                </Chip>
+                                </>
+                            );
+
+                            if (parsed.href) {
+                                return (
+                                    <a
+                                        key={`${citation}-${index}`}
+                                        href={parsed.href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 rounded-full border border-gray-100 bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-600 transition-colors hover:border-gray-200 hover:bg-white hover:text-gray-900"
+                                        title={citation}
+                                    >
+                                        {inner}
+                                    </a>
+                                );
+                            }
+                            return (
+                                <Badge key={`${citation}-${index}`} variant="secondary" className="gap-1 py-0.5" title={citation}>
+                                    {inner}
+                                </Badge>
                             );
                         })}
                         {hasMore && !showAll && (
                             <button
                                 onClick={() => setShowAll(true)}
-                                className="inline-flex items-center gap-0.5 rounded-full bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-500 transition-colors hover:bg-gray-100 border border-gray-100"
+                                className="inline-flex items-center rounded-full border border-gray-100 bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:bg-gray-100"
                             >
                                 +{links.length - maxVisible} more
                             </button>

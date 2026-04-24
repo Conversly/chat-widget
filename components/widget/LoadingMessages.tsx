@@ -43,10 +43,15 @@ export function LoadingMessages({ className }: LoadingMessagesProps) {
     }, []);
 
     return (
-        <div className={cn("flex items-center h-5 px-1", className)}>
+        <div className={cn("flex items-center gap-2.5 h-5 px-0.5", className)}>
+            <span className="flex items-end gap-[3px] pb-px">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400/80 animate-bounce [animation-delay:-0.3s] [animation-duration:1s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400/80 animate-bounce [animation-delay:-0.15s] [animation-duration:1s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400/80 animate-bounce [animation-duration:1s]" />
+            </span>
             <span
                 className={cn(
-                    "text-sm text-gray-500 transition-opacity duration-300",
+                    "text-[12.5px] text-gray-400 transition-opacity duration-300 tracking-tight",
                     isVisible ? "opacity-100" : "opacity-0"
                 )}
             >

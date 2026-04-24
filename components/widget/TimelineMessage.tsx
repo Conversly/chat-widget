@@ -66,10 +66,12 @@ export function DateSeparator({ date }: { date: Date }) {
   const formatted = formatDateForSeparator(date);
 
   return (
-    <div className="flex items-center justify-center my-2">
-      <div className="px-3 py-1 bg-gray-100 rounded-md text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+    <div className="flex items-center gap-3 my-3 px-4">
+      <div className="flex-1 h-px bg-gray-100" />
+      <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest whitespace-nowrap">
         {formatted}
-      </div>
+      </span>
+      <div className="flex-1 h-px bg-gray-100" />
     </div>
   );
 }

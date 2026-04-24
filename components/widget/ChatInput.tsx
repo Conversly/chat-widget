@@ -1,9 +1,10 @@
 "use client"
 
-import { useRef, useState, useCallback, useEffect } from "react"
-import { Send, Paperclip, Smile, Mic, Square, StopCircle } from "lucide-react"
+import { useRef, useState, useEffect } from "react"
+import { Send, Paperclip, Smile, Mic, Square } from "lucide-react"
 import type { WidgetConfig } from "@/types/chatbot";
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useAutosizeTextArea } from "@/hooks/use-autosize-textarea"
 
@@ -25,30 +26,25 @@ interface SpeechRecognitionEvent extends Event {
     results: SpeechRecognitionResultList;
     resultIndex: number;
 }
-
 interface SpeechRecognitionResultList {
     length: number;
     item(index: number): SpeechRecognitionResult;
     [index: number]: SpeechRecognitionResult;
 }
-
 interface SpeechRecognitionResult {
     isFinal: boolean;
     length: number;
     item(index: number): SpeechRecognitionAlternative;
     [index: number]: SpeechRecognitionAlternative;
 }
-
 interface SpeechRecognitionAlternative {
     transcript: string;
     confidence: number;
 }
-
 interface SpeechRecognitionErrorEvent extends Event {
     error: string;
     message: string;
 }
-
 interface SpeechRecognition extends EventTarget {
     lang: string;
     continuous: boolean;
@@ -62,13 +58,20 @@ interface SpeechRecognition extends EventTarget {
     onend: (() => void) | null;
     onstart: (() => void) | null;
 }
-
 declare global {
     interface Window {
         SpeechRecognition: new () => SpeechRecognition;
         webkitSpeechRecognition: new () => SpeechRecognition;
     }
 }
+
+const EMOJI_LIST = [
+    "😊","😂","❤️","👍","🙏","😍","😭","😅","🤔","😎",
+    "👋","🎉","🔥","💯","✅","🚀","💡","🤝","😢","😡",
+    "🙄","😮","🥰","🤣","👏","💪","🎯","⭐","💬","📝",
+    "😴","🤯","🥳","😬","🫡","🤭","😏","🫶","🙃","😤",
+    "👌","✌️","🤞","🫂","💥","🎊","🌟","🏆","📌","🔑",
+]
 
 export function ChatInput({
     config,
@@ -84,10 +87,11 @@ export function ChatInput({
 }: ChatInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [isRecording, setIsRecording] = useState(false)
-    const [transcript, setTranscript] = useState("")
     const recognitionRef = useRef<SpeechRecognition | null>(null)
+    // Tracks confirmed text before + during the current recording session
+    const baseInputRef = useRef("")
+    const [emojiOpen, setEmojiOpen] = useState(false)
 
-    // Auto-resize textarea, max ~3x original height (36px base -> 108px max)
     useAutosizeTextArea({
         ref: textareaRef,
         maxHeight: 120,
@@ -108,19 +112,30 @@ export function ChatInput({
         }
     }
 
-    const handleFileSelect = () => {
-        console.log("File select clicked - Feature coming soon")
-        // Trigger hidden file input if implemented
+    const handleEmojiSelect = (emoji: string) => {
+        const ta = textareaRef.current
+        if (ta) {
+            const start = ta.selectionStart ?? input.length
+            const end = ta.selectionEnd ?? input.length
+            const next = input.slice(0, start) + emoji + input.slice(end)
+            setInput(next)
+            // Restore cursor after emoji
+            requestAnimationFrame(() => {
+                ta.focus()
+                ta.setSelectionRange(start + emoji.length, start + emoji.length)
+            })
+        } else {
+            setInput(input + emoji)
+        }
+        setEmojiOpen(false)
     }
 
-    // Initialize speech recognition
-    const initSpeechRecognition = useCallback(() => {
-        if (typeof window === "undefined") return null
-
+    const startRecording = () => {
+        if (typeof window === "undefined") return
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
         if (!SpeechRecognition) {
-            console.error("Speech recognition not supported in this browser")
-            return null
+            alert("Speech recognition is not supported in your browser. Please try Chrome, Safari, or Edge.")
+            return
         }
 
         const recognition = new SpeechRecognition()
@@ -129,10 +144,10 @@ export function ChatInput({
         recognition.interimResults = true
         recognition.maxAlternatives = 1
 
-        recognition.onstart = () => {
-            setIsRecording(true)
-            setTranscript("")
-        }
+        // Capture current input as the base text for this recording session
+        baseInputRef.current = input
+
+        recognition.onstart = () => setIsRecording(true)
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
             let finalTranscript = ""
@@ -148,12 +163,14 @@ export function ChatInput({
             }
 
             if (finalTranscript) {
-                setTranscript((prevState: string) => prevState + finalTranscript)
-                setInput(input + finalTranscript)
+                // Append finalised speech to the base, then make it the new base
+                const sep = baseInputRef.current && !baseInputRef.current.endsWith(" ") ? " " : ""
+                baseInputRef.current = baseInputRef.current + sep + finalTranscript.trim()
+                setInput(baseInputRef.current)
             } else if (interimTranscript) {
-                // Show interim results temporarily
-                const withoutInterim = input.replace(/\s+$/, "")
-                setInput(withoutInterim + interimTranscript)
+                // Show live interim text on top of the confirmed base
+                const sep = baseInputRef.current && !baseInputRef.current.endsWith(" ") ? " " : ""
+                setInput(baseInputRef.current + sep + interimTranscript)
             }
         }
 
@@ -162,55 +179,35 @@ export function ChatInput({
             setIsRecording(false)
         }
 
-        recognition.onend = () => {
-            setIsRecording(false)
-            setTranscript("")
-        }
+        recognition.onend = () => setIsRecording(false)
 
-        return recognition
-    }, [setInput])
+        recognitionRef.current = recognition
+        try {
+            recognition.start()
+        } catch (error) {
+            console.error("Failed to start speech recognition:", error)
+        }
+    }
+
+    const stopRecording = () => {
+        recognitionRef.current?.stop()
+        recognitionRef.current = null
+        setIsRecording(false)
+    }
 
     // Cleanup on unmount
     useEffect(() => {
-        return () => {
-            if (recognitionRef.current) {
-                recognitionRef.current.stop()
-            }
-        }
+        return () => { recognitionRef.current?.stop() }
     }, [])
-
-    const handleVoiceClick = () => {
-        if (isRecording) {
-            // Stop recording
-            if (recognitionRef.current) {
-                recognitionRef.current.stop()
-                recognitionRef.current = null
-            }
-            setIsRecording(false)
-        } else {
-            // Start recording
-            const recognition = initSpeechRecognition()
-            if (recognition) {
-                recognitionRef.current = recognition
-                try {
-                    recognition.start()
-                } catch (error) {
-                    console.error("Failed to start speech recognition:", error)
-                }
-            } else {
-                alert("Speech recognition is not supported in your browser. Please try using Chrome, Safari, or Edge.")
-            }
-        }
-    }
 
     return (
         <div
             className={cn(
-                "border-t pt-3 px-4 pb-2 bg-white",
-                config.appearance === "dark" ? "border-gray-800 bg-gray-900" : "border-gray-100"
+                "border-t pt-2.5 px-3 pb-2.5",
+                config.appearance === "dark" ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"
             )}
         >
-            {/* Suggestions - Pills aligned to right */}
+            {/* Suggestion pills */}
             {config.suggestedMessages &&
                 config.suggestedMessages.filter((q: string) => q).length > 0 &&
                 (config.continueSuggestedMessages || !hasUserMessages) && (
@@ -234,15 +231,13 @@ export function ChatInput({
                     </div>
                 )}
 
-
-
-            {/* Input Section - Cal.com Style */}
+            {/* Input box */}
             <form
                 onSubmit={handleSubmit}
                 className={cn(
-                    "flex flex-col border rounded-xl overflow-hidden transition-shadow focus-within:ring-1 focus-within:ring-black/10 shadow-sm",
+                    "flex flex-col border rounded-2xl overflow-hidden transition-all duration-150 focus-within:ring-2 focus-within:ring-black/8 focus-within:border-gray-300 shadow-sm",
                     config.appearance === "dark"
-                        ? "bg-gray-800 border-gray-700 focus-within:ring-white/10"
+                        ? "bg-gray-800 border-gray-700 focus-within:ring-white/10 focus-within:border-gray-600"
                         : "bg-white border-gray-200"
                 )}
             >
@@ -255,7 +250,7 @@ export function ChatInput({
                     rows={1}
                     disabled={disabled}
                     className={cn(
-                        "w-full px-3 py-2 border-0 bg-transparent resize-none outline-none text-[15px] leading-relaxed",
+                        "w-full px-4 pt-3 pb-1 border-0 bg-transparent resize-none outline-none text-[14px] leading-relaxed",
                         config.appearance === "dark"
                             ? "text-white placeholder:text-gray-500"
                             : "text-gray-900 placeholder:text-gray-400"
@@ -263,54 +258,80 @@ export function ChatInput({
                 />
 
                 {/* Toolbar */}
-                <div className="flex items-center justify-between px-2 pb-2">
-                    {/* Left Actions: Attach & Emoji */}
-                    <div className="flex items-center gap-0.5 shrink-0 mb-0.5 ml-1">
+                <div className="flex items-center justify-between px-3 pb-3 pt-1">
+                    {/* Left: Attach + Emoji */}
+                    <div className="flex items-center gap-1">
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={handleFileSelect}
-                            className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                            onClick={() => console.log("Attach file — coming soon")}
+                            className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
                             disabled={disabled}
                             title="Attach file"
                         >
                             <Paperclip className="h-4 w-4" />
                         </Button>
 
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                            disabled={disabled}
-                            title="Add emoji"
-                        >
-                            <Smile className="h-4 w-4" />
-                        </Button>
+                        <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                        "h-8 w-8 rounded-lg transition-colors",
+                                        emojiOpen
+                                            ? "bg-gray-100 text-gray-700"
+                                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                                    )}
+                                    disabled={disabled}
+                                    title="Add emoji"
+                                >
+                                    <Smile className="h-4 w-4" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                side="top"
+                                align="start"
+                                className="w-64 p-2 shadow-lg border border-gray-100 rounded-2xl"
+                            >
+                                <div className="grid grid-cols-10 gap-0.5">
+                                    {EMOJI_LIST.map((emoji) => (
+                                        <button
+                                            key={emoji}
+                                            type="button"
+                                            onClick={() => handleEmojiSelect(emoji)}
+                                            className="flex items-center justify-center h-7 w-full text-lg rounded-lg hover:bg-gray-100 transition-colors"
+                                        >
+                                            {emoji}
+                                        </button>
+                                    ))}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     </div>
 
-                    {/* Right Actions */}
+                    {/* Right: Mic + Send/Stop */}
                     <div className="flex items-center gap-2">
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={handleVoiceClick}
+                            onClick={isRecording ? stopRecording : startRecording}
                             disabled={disabled}
                             title={isRecording ? "Stop recording" : "Voice input"}
                             className={cn(
-                                "h-8 w-8 rounded-lg transition-all duration-200",
+                                "h-8 w-8 rounded-full transition-all duration-200",
                                 isRecording
-                                    ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
-                                    : "text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    ? "bg-gray-900 text-white hover:bg-black"
+                                    : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                             )}
                         >
-                            {isRecording ? (
-                                <Square className="h-4 w-4 fill-current" />
-                            ) : (
-                                <Mic className="h-4 w-4" />
-                            )}
+                            {isRecording
+                                ? <Square className="h-3.5 w-3.5 fill-current" />
+                                : <Mic className="h-4 w-4" />
+                            }
                         </Button>
 
                         {isStreaming && onInterrupt ? (
@@ -320,38 +341,33 @@ export function ChatInput({
                                 onClick={onInterrupt}
                                 disabled={isInterrupting}
                                 className={cn(
-                                    "h-8 w-8 rounded-full transition-all duration-200 flex items-center justify-center",
-                                    "bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400 disabled:text-white",
-                                    isInterrupting && "opacity-70"
+                                    "h-8 w-8 rounded-full transition-all duration-200",
+                                    "bg-gray-900 text-white hover:bg-black disabled:opacity-50",
+                                    isInterrupting && "opacity-60"
                                 )}
                                 title="Stop response"
                             >
-                                {isInterrupting ? (
-                                    <Square className="h-4 w-4 animate-pulse" />
-                                ) : (
-                                    <StopCircle className="h-4 w-4" />
-                                )}
+                                <Square className="h-3.5 w-3.5 fill-current" />
                             </Button>
                         ) : (
                             <Button
                                 type="submit"
                                 size="icon"
                                 disabled={!input.trim() || disabled}
+                                style={input.trim() && !disabled && config.primaryColor ? { backgroundColor: config.primaryColor } : undefined}
                                 className={cn(
-                                    "h-8 w-8 rounded-full transition-all duration-200 flex items-center justify-center",
+                                    "h-8 w-8 rounded-full transition-all duration-200",
                                     config.appearance === "dark"
-                                        ? "bg-white text-black hover:bg-gray-200 disabled:bg-gray-800 disabled:text-gray-600"
-                                        : "bg-black text-white hover:bg-gray-800 disabled:bg-gray-100 disabled:text-gray-400"
+                                        ? "bg-white text-black hover:bg-gray-100 disabled:bg-gray-700 disabled:text-gray-500"
+                                        : "bg-gray-900 text-white hover:bg-black disabled:bg-gray-200 disabled:text-gray-400"
                                 )}
                             >
-                                <Send className="h-4 w-4 ml-0.5" />
+                                <Send className="h-3.5 w-3.5 translate-x-px" />
                             </Button>
                         )}
                     </div>
                 </div>
             </form>
-
-            {/* Footer Text Removed (Moved Top) */}
         </div>
     )
 }

@@ -80,6 +80,60 @@ interface ChatViewProps {
 }
 
 /**
+ * "Powered by Verlyai" mark. Tries the real PNG first; falls back to an
+ * inline SVG if the file can't be resolved (e.g. inline Shadow DOM embeds
+ * where /verly_logo_bw.png doesn't exist on the host origin).
+ */
+function PoweredByLogo() {
+    const [errored, setErrored] = useState(false);
+    if (errored) {
+        return (
+            <svg viewBox="0 0 24 24" className="w-[14px] h-[14px]" fill="none" aria-hidden="true">
+                <path
+                    d="M3 5l9 14L21 5"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        );
+    }
+    return (
+        <img
+            src="/verly_logo_bw.png"
+            alt=""
+            aria-hidden="true"
+            className="w-6 h-6 object-contain grayscale"
+            onError={() => setErrored(true)}
+        />
+    );
+}
+
+/**
+ * Small avatar used alongside the assistant's message bubble. Falls back to
+ * the first letter of the name if the configured image URL fails to load.
+ */
+function AssistantAvatar({ src, name }: { src?: string | null; name: string }) {
+    const [errored, setErrored] = useState(false);
+    const showImage = !!src && !errored;
+    return (
+        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-medium overflow-hidden shrink-0">
+            {showImage ? (
+                <img
+                    src={src!}
+                    alt={name}
+                    className="w-full h-full object-cover"
+                    onError={() => setErrored(true)}
+                />
+            ) : (
+                (name || "A").charAt(0).toUpperCase()
+            )}
+        </div>
+    );
+}
+
+/**
  * Determine if a message is a timeline/system event
  */
 function isTimelineMessage(message: Message): boolean {
@@ -306,6 +360,7 @@ export function ChatView({
                     <MessageBubble
                         from={msg.role === "user" ? "user" : "assistant"}
                         onBubbleClick={() => toggleMessageTime(msg.id)}
+                        primaryColor={msg.role === "user" ? config.primaryColor : undefined}
                     >
                         <MessageContent>
                             {msg.role === "assistant" || isAgent ? (
@@ -370,9 +425,9 @@ export function ChatView({
     const showSuggestions = !hasUserMessages && config.suggestedMessages?.length;
 
     return (
-        <div className="h-full flex flex-col bg-white">
+        <div className="h-full flex flex-col bg-[#fafafa]">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={onBack}
@@ -382,7 +437,7 @@ export function ChatView({
                     </button>
                     <div className="flex items-center gap-2">
                         {/* Agent avatar */}
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br bg-white flex items-center justify-center text-white text-sm font-medium overflow-hidden">
+                        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-600 text-sm font-medium overflow-hidden shrink-0">
                             {config.brandLogo ? (
                                 <img
                                     src={config.brandLogo}
@@ -483,10 +538,10 @@ export function ChatView({
 
             {/* Messages Area - Using our new Conversation component */}
             <ConversationContainer
-                className="flex-1 relative chat-scrollbar-container"
+                className="flex-1 relative chat-scrollbar-container bg-[#fafafa]"
                 messages={messages}
                 scrollButton={<ConversationScrollButton />}
-                style={{ '--chat-scrollbar-color': '#f3f4f6' } as React.CSSProperties}
+                style={{ '--chat-scrollbar-color': '#e5e7eb' } as React.CSSProperties}
             >
                 <ConversationContent>
                     {renderMessages()}
@@ -496,17 +551,10 @@ export function ChatView({
                         <div className="mb-3">
                             {/* Avatar */}
                             <div className="flex items-center gap-2 px-4 mb-1">
-                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-medium overflow-hidden shrink-0">
-                                    {(assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon) ? (
-                                        <img
-                                            src={assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon}
-                                            alt={assignedAgent?.displayName || "Agent"}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        (assignedAgent?.displayName || "A").charAt(0)
-                                    )}
-                                </div>
+                                <AssistantAvatar
+                                    src={assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon}
+                                    name={assignedAgent?.displayName || "Assistant"}
+                                />
                                 <span className="text-xs font-medium text-gray-600">
                                     {assignedAgent?.displayName || "Assistant"}
                                 </span>
@@ -533,17 +581,10 @@ export function ChatView({
                         <div className="mb-3">
                             {/* Avatar */}
                             <div className="flex items-center gap-2 px-4 mb-1">
-                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-medium overflow-hidden shrink-0">
-                                    {(assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon) ? (
-                                        <img
-                                            src={assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon}
-                                            alt={assignedAgent?.displayName || "Agent"}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        (assignedAgent?.displayName || "A").charAt(0)
-                                    )}
-                                </div>
+                                <AssistantAvatar
+                                    src={assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon}
+                                    name={assignedAgent?.displayName || "Assistant"}
+                                />
                                 <span className="text-xs font-medium text-gray-600">
                                     {assignedAgent?.displayName || "Assistant"}
                                 </span>
@@ -633,11 +674,7 @@ export function ChatView({
                         rel="noopener noreferrer"
                         className="flex items-center gap-1.5 opacity-40 hover:opacity-100 transition-opacity duration-200"
                     >
-                        <img
-                            src="/verly_logo_bw.png"
-                            alt="Verlyai Logo"
-                            className="w-6 h-6 object-contain grayscale"
-                        />
+                        <PoweredByLogo />
                         <span className="text-[11px] font-medium text-gray-500 tracking-tight">
                             Powered by <span className="font-bold text-gray-900">Verlyai</span>
                         </span>

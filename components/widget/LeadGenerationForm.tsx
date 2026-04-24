@@ -57,88 +57,87 @@ export function LeadGenerationForm({ config, leadForm, onSubmit, onDismiss }: Le
         setFormData(prev => ({ ...prev, [fieldId]: value }));
     };
 
+    const inputClass = "w-full px-3 py-2 text-[13px] text-gray-900 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-400 transition-all bg-white placeholder:text-gray-400";
+
     return (
         <div className="w-full space-y-3">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">{leadForm.title || "Contact Details"}</span>
+            <div>
+                <p className="text-sm font-semibold text-gray-900 leading-snug">{leadForm.title || "Contact Details"}</p>
+                {leadForm.subtitle && (
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{leadForm.subtitle}</p>
+                )}
             </div>
 
-            {leadForm.subtitle && (
-                <p className="text-xs text-gray-500 mb-2">
-                    {leadForm.subtitle}
-                </p>
-            )}
+            <form onSubmit={handleSubmit} className="space-y-2.5">
+                {leadForm.fields.sort((a, b) => a.position - b.position).map((field) => {
+                    const label = (
+                        <label htmlFor={`lead-${field.id}`} className="block text-[11px] font-medium text-gray-600 mb-1">
+                            {field.label}
+                            {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                        </label>
+                    );
+                    const placeholder = field.placeholder || field.label;
 
-            <form onSubmit={handleSubmit} className="space-y-2">
-                {leadForm.fields.sort((a, b) => a.position - b.position).map((field) => (
-                    <div key={field.id}>
-                        {field.type === 'textarea' ? (
-                            <textarea
-                                placeholder={field.placeholder || field.label + (field.required ? " *" : "")}
-                                value={formData[field.id] || ""}
-                                onChange={(e) => handleChange(field.id, e.target.value)}
-                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white resize-none"
-                                rows={3}
-                                style={{
-                                    // @ts-ignore variable styling
-                                    "--tw-ring-color": config.primaryColor || "#2D5A27"
-                                }}
-                            />
-                        ) : field.type === 'select' ? (
-                            <select
-                                value={formData[field.id] || ""}
-                                onChange={(e) => handleChange(field.id, e.target.value)}
-                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white"
-                                style={{
-                                    // @ts-ignore variable styling
-                                    "--tw-ring-color": config.primaryColor || "#2D5A27"
-                                }}
-                            >
-                                <option value="" disabled>
-                                    {field.placeholder || field.label + (field.required ? " *" : "")}
-                                </option>
-                                {field.options?.map((opt, idx) => (
-                                    <option key={idx} value={opt}>
-                                        {opt}
-                                    </option>
-                                ))}
-                            </select>
-                        ) : (
-                            <input
-                                type={field.type === 'phone' ? 'tel' : field.type}
-                                placeholder={field.placeholder || field.label + (field.required ? " *" : "")}
-                                value={formData[field.id] || ""}
-                                onChange={(e) => handleChange(field.id, e.target.value)}
-                                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white"
-                                style={{
-                                    // @ts-ignore variable styling
-                                    "--tw-ring-color": config.primaryColor || "#2D5A27"
-                                }}
-                            />
-                        )}
-                    </div>
-                ))}
+                    return (
+                        <div key={field.id}>
+                            {label}
+                            {field.type === 'textarea' ? (
+                                <textarea
+                                    id={`lead-${field.id}`}
+                                    placeholder={placeholder}
+                                    value={formData[field.id] || ""}
+                                    onChange={(e) => handleChange(field.id, e.target.value)}
+                                    className={cn(inputClass, "resize-none")}
+                                    rows={3}
+                                />
+                            ) : field.type === 'select' ? (
+                                <select
+                                    id={`lead-${field.id}`}
+                                    value={formData[field.id] || ""}
+                                    onChange={(e) => handleChange(field.id, e.target.value)}
+                                    className={cn(inputClass, !formData[field.id] && "text-gray-400")}
+                                >
+                                    <option value="" disabled>{placeholder}</option>
+                                    {field.options?.map((opt, idx) => (
+                                        <option key={idx} value={opt} className="text-gray-900">{opt}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    id={`lead-${field.id}`}
+                                    type={field.type === 'phone' ? 'tel' : field.type}
+                                    placeholder={placeholder}
+                                    value={formData[field.id] || ""}
+                                    onChange={(e) => handleChange(field.id, e.target.value)}
+                                    className={inputClass}
+                                />
+                            )}
+                        </div>
+                    );
+                })}
 
                 {error && (
-                    <p className="text-xs text-red-500">{error}</p>
+                    <p className="text-xs text-red-500 flex items-center gap-1">
+                        <span aria-hidden="true">⚠</span> {error}
+                    </p>
                 )}
 
                 <div className="flex gap-2 pt-1">
                     <button
                         type="button"
                         onClick={onDismiss}
-                        className="flex-1 py-1.5 px-3 rounded-md text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                        className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors"
                     >
                         Dismiss
                     </button>
                     <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="flex-1 py-1.5 px-3 rounded-md text-white text-xs font-medium transition-opacity flex items-center justify-center gap-1.5"
-                        style={{ backgroundColor: config.primaryColor || "#2D5A27" }}
+                        className="flex-1 py-2 px-3 rounded-lg text-white text-xs font-semibold transition-all flex items-center justify-center gap-1.5 hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+                        style={{ backgroundColor: config.primaryColor || "#111111" }}
                     >
                         {isSubmitting ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                             leadForm.ctaText || "Submit"
                         )}

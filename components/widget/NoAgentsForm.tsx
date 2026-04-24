@@ -104,63 +104,49 @@ export function NoAgentsForm({ config, onSubmit, onDismiss, storedLead }: NoAgen
 
     return (
         <div className="w-full space-y-3">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">{noAgentsForm.title}</span>
+            <div>
+                <p className="text-[13px] font-semibold text-gray-900">{noAgentsForm.title}</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{noAgentsForm.description}</p>
             </div>
 
-            <p className="text-xs text-gray-500 mb-3">
-                {noAgentsForm.description}
-            </p>
-
             <form onSubmit={handleSubmit} className="space-y-2">
-                <div>
-                    <input
-                        type={fields.name.type}
-                        placeholder={fields.name.placeholder}
-                        value={formData.name}
-                        onChange={(e) => handleChange("name", e.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white"
-                        style={{
-                            // @ts-ignore variable styling
-                            "--tw-ring-color": config.primaryColor || "#2D5A27"
-                        }}
-                    />
-                </div>
-
-                <div>
-                    <input
-                        type={fields.email.type}
-                        placeholder={fields.email.placeholder}
-                        value={formData.email}
-                        onChange={(e) => handleChange("email", e.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-0 transition-all bg-white"
-                        style={{
-                            // @ts-ignore variable styling
-                            "--tw-ring-color": config.primaryColor || "#2D5A27"
-                        }}
-                    />
-                </div>
+                <input
+                    type={fields.name.type}
+                    placeholder={fields.name.placeholder}
+                    value={formData.name}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 transition-all bg-gray-50 focus:bg-white placeholder:text-gray-400"
+                />
+                <input
+                    type={fields.email.type}
+                    placeholder={fields.email.placeholder}
+                    value={formData.email}
+                    onChange={(e) => handleChange("email", e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 transition-all bg-gray-50 focus:bg-white placeholder:text-gray-400"
+                />
 
                 {error && (
-                    <p className="text-xs text-red-500">{error}</p>
+                    <p className="text-xs text-red-500 flex items-center gap-1">
+                        <span>⚠</span> {error}
+                    </p>
                 )}
 
                 <div className="flex gap-2 pt-1">
                     <button
                         type="button"
                         onClick={onDismiss}
-                        className="flex-1 py-1.5 px-3 rounded-md text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                        className="flex-1 py-2 px-3 rounded-xl text-xs font-medium border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
                     >
                         {buttons.dismiss}
                     </button>
                     <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="flex-1 py-1.5 px-3 rounded-md text-white text-xs font-medium transition-opacity flex items-center justify-center gap-1.5"
-                        style={{ backgroundColor: config.primaryColor || "#2D5A27" }}
+                        className="flex-1 py-2 px-3 rounded-xl text-white text-xs font-semibold transition-all flex items-center justify-center gap-1.5 hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+                        style={{ backgroundColor: config.primaryColor || "#111111" }}
                     >
                         {isSubmitting ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                             buttons.submit
                         )}
