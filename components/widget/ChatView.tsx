@@ -338,22 +338,34 @@ export function ChatView({
 
             // Regular message rendering
             const isAgent = msg.role === "agent";
+            const isAssistant = msg.role === "assistant";
             const agentName = assignedAgent?.displayName || "Agent";
             const agentAvatar = assignedAgent?.avatarUrl;
+            const botName = config.botName || config.brandName || "Assistant";
+            const botLogo = config.botAvatar || config.brandLogo || config.widgetIcon;
+            const labelName = isAgent ? agentName : botName;
+            const labelLogo = isAgent ? agentAvatar : botLogo;
+
+            // Only show the bot/agent label when this message starts a new sender run
+            // (i.e. previous non-system message was from a different role).
+            let prevNonSystem: Message | undefined;
+            for (let j = i - 1; j >= 0; j--) {
+                if (!isTimelineMessage(messages[j])) { prevNonSystem = messages[j]; break; }
+            }
+            const showLabel = (isAssistant || isAgent) && (!prevNonSystem || prevNonSystem.role !== msg.role);
 
             result.push(
                 <div key={msg.id} className="mb-1 group">
-                    {/* Agent identity label (only for agent messages) */}
-                    {isAgent && (
-                        <div className="flex items-center gap-2 px-4 mb-1">
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-medium overflow-hidden shrink-0">
-                                {agentAvatar ? (
-                                    <img src={agentAvatar} alt={agentName} className="w-full h-full object-cover" />
+                    {showLabel && (
+                        <div className="flex items-center gap-2 px-4 mb-1 mt-2">
+                            <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-[10px] font-semibold text-gray-600 overflow-hidden shrink-0 border border-gray-100">
+                                {labelLogo ? (
+                                    <img src={labelLogo} alt={labelName} className="w-full h-full object-cover" />
                                 ) : (
-                                    agentName.charAt(0)
+                                    labelName.charAt(0)
                                 )}
                             </div>
-                            <span className="text-xs font-medium text-gray-600">{agentName}</span>
+                            <span className="text-sm font-semibold text-gray-900">{labelName}</span>
                         </div>
                     )}
 
@@ -367,7 +379,7 @@ export function ChatView({
                                 msg.content ? (
                                     <MessageResponse>{msg.content}</MessageResponse>
                                 ) : (
-                                    <LoadingMessages />
+                                    <LoadingMessages steps={config.thinkingSteps} />
                                 )
                             ) : (
                                 <span>{msg.content}</span>
@@ -550,17 +562,17 @@ export function ChatView({
                     {showLeadForm && onLeadSubmit && onLeadDismiss && (
                         <div className="mb-3">
                             {/* Avatar */}
-                            <div className="flex items-center gap-2 px-4 mb-1">
+                            <div className="flex items-center gap-2 px-4 mb-1 mt-2">
                                 <AssistantAvatar
                                     src={assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon}
-                                    name={assignedAgent?.displayName || "Assistant"}
+                                    name={assignedAgent?.displayName || config.botName || config.brandName || "Assistant"}
                                 />
-                                <span className="text-xs font-medium text-gray-600">
-                                    {assignedAgent?.displayName || "Assistant"}
+                                <span className="text-sm font-semibold text-gray-900">
+                                    {assignedAgent?.displayName || config.botName || config.brandName || "Assistant"}
                                 </span>
                             </div>
 
-                            <MessageBubble from="assistant" fullWidth={true}>
+                            <MessageBubble from="assistant" fullWidth={true} card={true}>
                                 <MessageContent>
                                     <LeadGenerationForm
                                         config={config}
@@ -580,17 +592,17 @@ export function ChatView({
                     {showNoAgentsForm && onNoAgentsFormSubmit && onNoAgentsFormDismiss && (
                         <div className="mb-3">
                             {/* Avatar */}
-                            <div className="flex items-center gap-2 px-4 mb-1">
+                            <div className="flex items-center gap-2 px-4 mb-1 mt-2">
                                 <AssistantAvatar
                                     src={assignedAgent?.avatarUrl || config.botAvatar || config.widgetIcon}
-                                    name={assignedAgent?.displayName || "Assistant"}
+                                    name={assignedAgent?.displayName || config.botName || config.brandName || "Assistant"}
                                 />
-                                <span className="text-xs font-medium text-gray-600">
-                                    {assignedAgent?.displayName || "Assistant"}
+                                <span className="text-sm font-semibold text-gray-900">
+                                    {assignedAgent?.displayName || config.botName || config.brandName || "Assistant"}
                                 </span>
                             </div>
 
-                            <MessageBubble from="assistant" fullWidth={true}>
+                            <MessageBubble from="assistant" fullWidth={true} card={true}>
                                 <MessageContent>
                                     <NoAgentsForm
                                         config={config}
@@ -609,7 +621,7 @@ export function ChatView({
                     {/* Feedback Form */}
                     {feedbackState && (
                         <div className="mb-3 px-4">
-                            <MessageBubble from="assistant" fullWidth={true}>
+                            <MessageBubble from="assistant" fullWidth={true} card={true}>
                                 <MessageContent>
                                     {feedbackState.type === "positive" ? (
                                         <PositiveFeedbackForm

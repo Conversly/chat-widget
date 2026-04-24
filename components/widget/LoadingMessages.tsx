@@ -1,62 +1,86 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LoadingMessagesProps {
     className?: string;
+    steps?: string[];
+    /** Ms between step reveals. */
+    stepDelayMs?: number;
+    /** Wait before revealing the first step (avoids flicker for fast responses). */
+    initialDelayMs?: number;
 }
 
-const defaultMessages = [
-    "Thinking...",
-    "Analyzing your question...",
-    "Searching for the best answer...",
-    "Almost there...",
-    "Getting things ready for you...",
-    "Consulting the knowledge base...",
-    "Finding the most accurate information...",
-    "Crafting a thoughtful response...",
-    "Double-checking the details...",
-    "Connecting the dots for you...",
-    "Synthesizing insights...",
-    "Reviewing multiple sources...",
-    "Polishing the perfect answer...",
-    "This will be worth the wait...",
-    "Preparing something helpful...",
+const DEFAULT_STEPS = [
+    "Analyzing your request",
+    "Identifying key details",
+    "Crafting response",
 ];
 
-export function LoadingMessages({ className }: LoadingMessagesProps) {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [isVisible, setIsVisible] = useState(true);
+/**
+ * LoadingMessages — Progressive checklist shown while the assistant is thinking.
+ *
+ * Each step appears in sequence with a spinner, then flips to a checkmark when
+ * the next step begins. The last step stays "active" until real content replaces
+ * this component.
+ */
+export function LoadingMessages({
+    className,
+    steps = DEFAULT_STEPS,
+    stepDelayMs = 900,
+    initialDelayMs = 400,
+}: LoadingMessagesProps) {
+    const [activeIndex, setActiveIndex] = useState(-1);
 
     useEffect(() => {
-        // Show each message for 6 seconds before transitioning
-        const messageInterval = setInterval(() => {
-            setIsVisible(false);
-            setTimeout(() => {
-                setCurrentIndex((prev) => (prev + 1) % defaultMessages.length);
-                setIsVisible(true);
-            }, 300); // Brief fade out before changing message
-        }, 6000);
+        if (steps.length === 0) return;
 
-        return () => clearInterval(messageInterval);
-    }, []);
+        const firstTimer = setTimeout(() => setActiveIndex(0), initialDelayMs);
+        const interval = setInterval(() => {
+            setActiveIndex((i) => (i < steps.length - 1 ? i + 1 : i));
+        }, stepDelayMs);
+
+        return () => {
+            clearTimeout(firstTimer);
+            clearInterval(interval);
+        };
+    }, [steps, stepDelayMs, initialDelayMs]);
+
+    if (activeIndex < 0) {
+        return (
+            <div className={cn("flex items-center gap-2 py-1", className)}>
+                <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" />
+            </div>
+        );
+    }
+
+    const visible = steps.slice(0, activeIndex + 1);
 
     return (
-        <div className={cn("flex items-center gap-2.5 h-5 px-0.5", className)}>
-            <span className="flex items-end gap-[3px] pb-px">
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400/80 animate-bounce [animation-delay:-0.3s] [animation-duration:1s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400/80 animate-bounce [animation-delay:-0.15s] [animation-duration:1s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400/80 animate-bounce [animation-duration:1s]" />
-            </span>
-            <span
-                className={cn(
-                    "text-[12.5px] text-gray-400 transition-opacity duration-300 tracking-tight",
-                    isVisible ? "opacity-100" : "opacity-0"
-                )}
-            >
-                {defaultMessages[currentIndex]}
-            </span>
+        <div className={cn("flex flex-col gap-1.5 py-0.5", className)}>
+            {visible.map((step, idx) => {
+                const isActive = idx === activeIndex;
+                return (
+                    <div
+                        key={step}
+                        className="flex items-center gap-2 text-sm animate-in fade-in slide-in-from-bottom-1 duration-300"
+                    >
+                        {isActive ? (
+                            <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin shrink-0" />
+                        ) : (
+                            <Check className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                        )}
+                        <span className={cn(
+                            "transition-colors",
+                            isActive ? "text-gray-600" : "text-gray-400"
+                        )}>
+                            {step}
+                        </span>
+                    </div>
+                );
+            })}
         </div>
     );
 }

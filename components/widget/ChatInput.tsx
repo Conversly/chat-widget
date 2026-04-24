@@ -1,10 +1,9 @@
 "use client"
 
 import { useRef, useState, useEffect } from "react"
-import { Send, Paperclip, Smile, Mic, Square } from "lucide-react"
+import { Send, Mic, Square } from "lucide-react"
 import type { WidgetConfig } from "@/types/chatbot";
 import { Button } from "@/components/ui/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useAutosizeTextArea } from "@/hooks/use-autosize-textarea"
 
@@ -65,13 +64,6 @@ declare global {
     }
 }
 
-const EMOJI_LIST = [
-    "😊","😂","❤️","👍","🙏","😍","😭","😅","🤔","😎",
-    "👋","🎉","🔥","💯","✅","🚀","💡","🤝","😢","😡",
-    "🙄","😮","🥰","🤣","👏","💪","🎯","⭐","💬","📝",
-    "😴","🤯","🥳","😬","🫡","🤭","😏","🫶","🙃","😤",
-    "👌","✌️","🤞","🫂","💥","🎊","🌟","🏆","📌","🔑",
-]
 
 export function ChatInput({
     config,
@@ -90,7 +82,6 @@ export function ChatInput({
     const recognitionRef = useRef<SpeechRecognition | null>(null)
     // Tracks confirmed text before + during the current recording session
     const baseInputRef = useRef("")
-    const [emojiOpen, setEmojiOpen] = useState(false)
 
     useAutosizeTextArea({
         ref: textareaRef,
@@ -110,24 +101,6 @@ export function ChatInput({
             e.preventDefault()
             handleSubmit(e)
         }
-    }
-
-    const handleEmojiSelect = (emoji: string) => {
-        const ta = textareaRef.current
-        if (ta) {
-            const start = ta.selectionStart ?? input.length
-            const end = ta.selectionEnd ?? input.length
-            const next = input.slice(0, start) + emoji + input.slice(end)
-            setInput(next)
-            // Restore cursor after emoji
-            requestAnimationFrame(() => {
-                ta.focus()
-                ta.setSelectionRange(start + emoji.length, start + emoji.length)
-            })
-        } else {
-            setInput(input + emoji)
-        }
-        setEmojiOpen(false)
     }
 
     const startRecording = () => {
@@ -247,7 +220,7 @@ export function ChatInput({
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={config.placeholder || "Message..."}
-                    rows={1}
+                    rows={3}
                     disabled={disabled}
                     className={cn(
                         "w-full px-4 pt-3 pb-1 border-0 bg-transparent resize-none outline-none text-[14px] leading-relaxed",
@@ -258,61 +231,7 @@ export function ChatInput({
                 />
 
                 {/* Toolbar */}
-                <div className="flex items-center justify-between px-3 pb-3 pt-1">
-                    {/* Left: Attach + Emoji */}
-                    <div className="flex items-center gap-1">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => console.log("Attach file — coming soon")}
-                            className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-                            disabled={disabled}
-                            title="Attach file"
-                        >
-                            <Paperclip className="h-4 w-4" />
-                        </Button>
-
-                        <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className={cn(
-                                        "h-8 w-8 rounded-lg transition-colors",
-                                        emojiOpen
-                                            ? "bg-gray-100 text-gray-700"
-                                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-                                    )}
-                                    disabled={disabled}
-                                    title="Add emoji"
-                                >
-                                    <Smile className="h-4 w-4" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                                side="top"
-                                align="start"
-                                className="w-64 p-2 shadow-lg border border-gray-100 rounded-2xl"
-                            >
-                                <div className="grid grid-cols-10 gap-0.5">
-                                    {EMOJI_LIST.map((emoji) => (
-                                        <button
-                                            key={emoji}
-                                            type="button"
-                                            onClick={() => handleEmojiSelect(emoji)}
-                                            className="flex items-center justify-center h-7 w-full text-lg rounded-lg hover:bg-gray-100 transition-colors"
-                                        >
-                                            {emoji}
-                                        </button>
-                                    ))}
-                                </div>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-
-                    {/* Right: Mic + Send/Stop */}
+                <div className="flex items-center justify-end px-3 pb-3 pt-1">
                     <div className="flex items-center gap-2">
                         <Button
                             type="button"
@@ -324,9 +243,13 @@ export function ChatInput({
                             className={cn(
                                 "h-8 w-8 rounded-full transition-all duration-200",
                                 isRecording
-                                    ? "bg-gray-900 text-white hover:bg-black"
+                                    ? "animate-pulse"
                                     : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                             )}
+                            style={isRecording ? {
+                                backgroundColor: `${config.primaryColor}20`,
+                                color: config.primaryColor,
+                            } : undefined}
                         >
                             {isRecording
                                 ? <Square className="h-3.5 w-3.5 fill-current" />
@@ -342,9 +265,9 @@ export function ChatInput({
                                 disabled={isInterrupting}
                                 className={cn(
                                     "h-8 w-8 rounded-full transition-all duration-200",
-                                    "bg-gray-900 text-white hover:bg-black disabled:opacity-50",
                                     isInterrupting && "opacity-60"
                                 )}
+                                style={{ backgroundColor: config.primaryColor, color: "white" }}
                                 title="Stop response"
                             >
                                 <Square className="h-3.5 w-3.5 fill-current" />

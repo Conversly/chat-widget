@@ -13,30 +13,35 @@ interface MessageProps extends React.HTMLAttributes<HTMLDivElement> {
     onBubbleClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
     fullWidth?: boolean;
     primaryColor?: string;
+    /** Force card container for assistant (used for forms/rich content). */
+    card?: boolean;
 }
 
-export function Message({ from, children, className, onBubbleClick, fullWidth, primaryColor, ...props }: MessageProps) {
-    const userBg = primaryColor || "#111111";
+export function Message({ from, children, className, onBubbleClick, fullWidth, primaryColor, card, ...props }: MessageProps) {
+    const isUser = from === "user";
+
+    // User messages: themed bubble using primaryColor.
+    // Assistant: no bubble by default (flush-left plain text).
+    //   If `card` is set, wrap in a subtle bordered card (for forms, rich content).
+    const innerClass = isUser
+        ? cn("rounded-2xl px-3.5 py-2.5 max-w-full text-white rounded-br-sm", fullWidth ? "w-full" : "")
+        : card
+            ? "border border-gray-100 rounded-2xl px-4 py-3 bg-white w-full"
+            : cn("text-gray-900 px-4", fullWidth ? "w-full" : "max-w-full");
+
     return (
         <div
             className={cn(
                 "flex w-full",
-                from === "user" ? "justify-end" : "justify-start",
+                isUser ? "justify-end" : "justify-start",
                 className
             )}
             {...props}
         >
             <div
                 onClick={onBubbleClick}
-                style={from === "user" ? { backgroundColor: userBg } : undefined}
-                className={cn(
-                    "rounded-2xl px-3.5 py-2.5",
-                    fullWidth ? "w-full" : "max-w-full",
-                    onBubbleClick && "cursor-pointer",
-                    from === "user"
-                        ? "text-white rounded-br-sm"
-                        : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"
-                )}
+                style={isUser ? { backgroundColor: primaryColor || "#111111" } : undefined}
+                className={cn(innerClass, onBubbleClick && "cursor-pointer")}
             >
                 {children}
             </div>

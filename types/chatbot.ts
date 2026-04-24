@@ -139,6 +139,10 @@ export interface WidgetConfig {
     // Suggested Messages
     suggestedMessages?: string[];
 
+    // Progressive "thinking" steps shown while streaming. Displayed as a
+    // checklist that fills in over time to keep the user engaged.
+    thinkingSteps?: string[];
+
     // Attention (popup/sound)
     messagePopupEnabled?: boolean;
     popupSoundEnabled?: boolean;
